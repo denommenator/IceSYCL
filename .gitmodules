@@ -1,0 +1,3 @@
+[submodule "extern/SYCL-Small-Linear-Algebra"]
+	path = extern/SYCL-Small-Linear-Algebra
+	url = https://github.com/denommenator/SYCL-Small-Linear-Algebra.git
