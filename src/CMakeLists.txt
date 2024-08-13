@@ -1,7 +1,7 @@
-file(GLOB HEADER_LIST CONFIGURE_DEPENDS "${IceSYCL_SOURCE_DIR}/include/IceSYCL")
+add_library(IceSYCL_library INTERFACE)
 
-add_library(IceSYCL_library IceSYCL.cpp ${HEADER_LIST})
+target_include_directories(IceSYCL_library INTERFACE ../include)
 
-target_include_directories(IceSYCL_library PUBLIC ../include)
+target_link_libraries(IceSYCL_library INTERFACE oneDPL small_la_library)
 
-target_compile_features(IceSYCL_library PUBLIC cxx_std_17)
+target_compile_features(IceSYCL_library INTERFACE cxx_std_17)
