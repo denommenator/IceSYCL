@@ -2,10 +2,10 @@
 // Created by robert-denomme on 8/12/24.
 //
 
-#ifndef CONFIGURATION_HPP
-#define CONFIGURATION_HPP
+#ifndef INTERPOLATION_HPP
+#define INTERPOLATION_HPP
 
-#include <small_la/small_matrix.hpp>
+#include "coordinates.hpp"
 
 namespace iceSYCL
 {
@@ -20,34 +20,6 @@ static constexpr int compile_time_power(const int base, const int exponent)
     return ret;
 }
 
-template<class Tscalar_t, int TDimension>
-class CoordinateConfiguration
-{
-public:
-    static constexpr int Dimension = TDimension;
-    using scalar_t = Tscalar_t;
-    using Coordinate_t = small_la::small_matrix<scalar_t, Dimension, 1>;
-    using NodeIndex_t = small_la::small_matrix<int, Dimension, 1>;
-
-};
-
-using Double2DCoordinateConfiguration = CoordinateConfiguration<double, 2>;
-using Float2DCoordinateConfiguration = CoordinateConfiguration<float, 2>;
-using Double3DCoordinateConfiguration = CoordinateConfiguration<double, 3>;
-using Float3DCoordinateConfiguration = CoordinateConfiguration<float, 3>;
-
-
-
-
-template<class TCoordinateConfiguration>
-struct ParticleNodeInteraction
-{
-    int particle_id;
-    typename TCoordinateConfiguration::NodeIndex_t node_index;
-    int node_id;
-    int particle_interaction_number;
-
-};
 
 template<class TCoordinateConfiguration>
 class CubicInterpolationScheme
@@ -82,7 +54,73 @@ public:
         }
     }
 
+    scalar_t value(NodeIndex_t i, Coordinate_t x_p)
+    {
+        scalar_t x_i_0 = i(0) * h;
+        scalar_t x_i_1 = i(1) * h;
+
+        return n(1.0 / h * (x_p(0) - x_i_0))
+                * n(1.0 / h * (x_p(1) - x_i_1));
+    }
+
+    Coordinate_t gradient_impl(NodeIndex_t i, Coordinate_t x_p)
+    {
+        scalar_t x_i_0 = i(0) * h;
+        scalar_t x_i_1 = i(1) * h;
+
+        return Coordinate(
+            1.0 / h * n_prime(1.0 / h * (x_p(0) - x_i_0)) * n(1.0 / h * (x_p(1) - x_i_1)),
+            1.0 / h * n(1.0 / h * (x_p(0) - x_i_0)) * n_prime(1.0 / h * (x_p(1) - x_i_1)));
+
+    }
+
+    Coordinate_t position(NodeIndex_t i)
+    {
+        NodeIndex_t i_scalar;
+        for(int dim = 0; dim < Dimension; dim++)
+        {
+            i_scalar(dim) = i(dim);
+        }
+        return h * i_scalar;
+    }
+
 private:
+    static scalar_t n(scalar_t x)
+    {
+        if(std::abs(x) >= 2)
+        {
+            return 0;
+        }
+        else if(std::abs(x) >= 1)
+        {
+            return 1.0 / 6 * (2.0 - std::abs(x)) * (2.0 - std::abs(x)) * (2.0 - std::abs(x));
+        }
+        else
+        {
+            return 1.0 / 2 * std::abs(x) * std::abs(x) * std::abs(x) - std::abs(x) * std::abs(x) + 2.0 / 3.0;
+        }
+    }
+
+    static scalar_t n_prime(scalar_t x)
+    {
+        if(std::abs(x) >= 2)
+        {
+            return 0;
+        }
+        else if(std::abs(x) >= 1)
+        {
+            return - 3.0 * 1.0 / 6 * (2.0 - std::abs(x)) * (2.0 - std::abs(x)) * (std::abs(x) / x);
+        }
+        else if(std::abs(x) > 1.0E-10)
+        {
+            return 3.0 * 1.0 / 2 * x * x * std::abs(x) / x - 2 * x;
+        }
+        else
+        {
+            return 0.0;
+        }
+    }
+
     static NodeIndex_t offset(int local_interaction_number)
     {
         NodeIndex_t ret;
@@ -111,4 +149,4 @@ private:
 
 }
 
-#endif //CONFIGURATION_HPP
+#endif //INTERPOLATION_HPP

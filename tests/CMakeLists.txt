@@ -6,19 +6,15 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(catch)
 # Adds Catch2::Catch2
 
-# Tests need to be added as executables first
-add_executable(testlib testlib.cpp)
-add_executable(testconfigurations configtest.cpp)
 
-# I'm using C++17 in the test
-target_compile_features(testlib PRIVATE cxx_std_17)
-target_compile_features(testconfigurations PRIVATE cxx_std_17)
+set(TEST_LIST
+"testlib"
+"interpolation_test")
 
-# Should be linked to the main library, as well as the Catch2 testing library
-target_link_libraries(testlib PRIVATE IceSYCL_library oneDPL small_la_library Catch2::Catch2)
-target_link_libraries(testconfigurations PRIVATE IceSYCL_library oneDPL small_la_library Catch2::Catch2)
-
-# If you register a test, then ctest and make test will run it.
-# You can also run examples and check the output, as well.
-add_test(NAME testlibtest COMMAND testlib) # Command can be a target
-add_test(NAME configurationtest COMMAND testconfigurations)
+foreach(testVAR IN LISTS TEST_LIST)
+    add_executable("${testVAR}" "${testVAR}.cpp")
+    target_compile_features("${testVAR}" PRIVATE cxx_std_17)
+    target_link_libraries("${testVAR}" PRIVATE IceSYCL_library oneDPL Catch2::Catch2)
+    add_test(NAME "${testVAR}" COMMAND "${testVAR}")
+    set_target_properties("${testVAR}" PROPERTIES LINKER_LANGUAGE CXX)
+endforeach()

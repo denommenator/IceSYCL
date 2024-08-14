@@ -3,10 +3,9 @@
 //
 #define CATCH_CONFIG_MAIN
 #include <catch2/catch.hpp>
-#include <IceSYCL/configuration.hpp>
-#include <small_la/small_matrix.hpp>
+#include <IceSYCL/interpolation.hpp>
 
-TEST_CASE( "Interaction Generator Test", "[Configuration]" )
+TEST_CASE( "Interaction Generator Test", "[Interpolation]" )
 {
     using namespace iceSYCL;
     using Cubic2d = CubicInterpolationScheme<Double2DCoordinateConfiguration>;
@@ -19,7 +18,7 @@ TEST_CASE( "Interaction Generator Test", "[Configuration]" )
     interpolator.h = 1.0;
     std::array<ParticleNodeInteraction<Double2DCoordinateConfiguration>, 16> interactions;
 
-    Double2DCoordinateConfiguration::Coordinate_t p = small_la::MakeVector<double, 2>({1.0, 1.0});
+    Double2DCoordinateConfiguration::Coordinate_t p = MakeCoordinate<Double2DCoordinateConfiguration>({1.0, 1.0});
 
     interpolator.generate_particle_node_interactions(0, p, interactions.begin());
 
@@ -48,7 +47,7 @@ TEST_CASE( "Interaction Generator Test", "[Configuration]" )
 
 }
 
-TEST_CASE( "Interaction Generator Kernel Test", "[Configuration]" )
+TEST_CASE( "Interaction Generator Kernel Test", "[Interpolation]" )
 {
     using namespace iceSYCL;
     using Cubic2d = CubicInterpolationScheme<Double2DCoordinateConfiguration>;
@@ -57,8 +56,8 @@ TEST_CASE( "Interaction Generator Kernel Test", "[Configuration]" )
     interpolator.h = 1.0;
     std::array<ParticleNodeInteraction<Double2DCoordinateConfiguration>, 32> interactions;
 
-    Double2DCoordinateConfiguration::Coordinate_t p0 = small_la::MakeVector<double, 2>({1.0, 1.0});
-    Double2DCoordinateConfiguration::Coordinate_t p1 = small_la::MakeVector<double, 2>({1.0, 1.0});
+    Double2DCoordinateConfiguration::Coordinate_t p0 = MakeCoordinate<Double2DCoordinateConfiguration>({1.0, 1.0});
+    Double2DCoordinateConfiguration::Coordinate_t p1 = MakeCoordinate<Double2DCoordinateConfiguration>({1.0, 1.0});
     std::array<Double2DCoordinateConfiguration::Coordinate_t, 2> points = {p0, p1};
     sycl::buffer pointsB(points);
     {
@@ -115,6 +114,37 @@ TEST_CASE( "Interaction Generator Kernel Test", "[Configuration]" )
     std::set_symmetric_difference(indicesProduced.begin() + 16, indicesProduced.begin() + 32, indicesDesired.begin(), indicesDesired.end(), std::inserter(symmetric_difference, symmetric_difference.begin()));
     REQUIRE(symmetric_difference.empty());
 
+
+
+}
+
+TEST_CASE( "Interpolation test", "[Interpolation]" )
+{
+    using namespace iceSYCL;
+
+    using Cubic2d = CubicInterpolationScheme<Double2DCoordinateConfiguration>;
+    using Interactions = ParticleNodeInteraction<Cubic2d::CoordinateConfiguration>;
+
+    std::array<Cubic2d::scalar_t, Cubic2d::num_interactions_per_particle> node_masses;
+
+    std::array<Interactions, Cubic2d::num_interactions_per_particle> interactions;
+
+    auto p = MakeCoordinate<Cubic2d::CoordinateConfiguration>({2.5, 2.5});
+    Cubic2d::scalar_t p_mass = 1.0;
+
+    Cubic2d interpolator;
+    interpolator.h = 1.0;
+    interpolator.generate_particle_node_interactions(0, p, interactions.begin());
+
+    Cubic2d::scalar_t total_mass = 0;
+    for(auto interaction : interactions)
+    {
+        Cubic2d::scalar_t mass_i = p_mass * interpolator.value(interaction.node_index, p);
+        node_masses[interaction.particle_interaction_number] = mass_i;
+        total_mass += mass_i;
+    }
+
+    REQUIRE(total_mass == Approx(p_mass));
 
 
 }
