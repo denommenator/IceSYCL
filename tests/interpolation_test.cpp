@@ -16,11 +16,11 @@ TEST_CASE( "Interaction Generator Test", "[Interpolation]" )
 
     Cubic2d interpolator;
     interpolator.h = 1.0;
-    std::array<ParticleNodeInteraction<Double2DCoordinateConfiguration>, 16> interactions;
+    std::array<Cubic2d::Interaction, 16> interactions;
 
     Double2DCoordinateConfiguration::Coordinate_t p = MakeCoordinate<Double2DCoordinateConfiguration>({1.0, 1.0});
 
-    interpolator.generate_particle_node_interactions(0, p, interactions.begin());
+    interpolator.generate_particle_node_interactions(p, interactions.begin());
 
 
     std::set<std::tuple<int, int>> indicesDesired =
@@ -33,7 +33,7 @@ TEST_CASE( "Interaction Generator Test", "[Interpolation]" )
     std::set<std::tuple<int, int>> indicesProduced;
     auto prducedInserter= std::inserter(indicesProduced, indicesProduced.begin());
 
-    std::transform(interactions.begin(), interactions.end(), prducedInserter, [](ParticleNodeInteraction<Double2DCoordinateConfiguration> interaction)
+    std::transform(interactions.begin(), interactions.end(), prducedInserter, [](Cubic2d::Interaction interaction)
     {
         return std::make_tuple(interaction.node_index(0), interaction.node_index(1));
     });
@@ -77,8 +77,20 @@ TEST_CASE( "Interaction Generator Kernel Test", "[Interpolation]" )
             h.parallel_for(sycl::range<1>(2), [=](sycl::id<1> idx)
             {
                 auto p = pointsAcc[idx];
+
+                auto converter = [=](const Cubic2d::Interaction interaction)
+                {
+                    ParticleNodeInteraction<Cubic2d::CoordinateConfiguration> particle_node_interaction;
+                    particle_node_interaction.node_id = 0;
+                    particle_node_interaction.node_index = interaction.node_index;
+                    particle_node_interaction.particle_id = idx[0];
+                    particle_node_interaction.particle_interaction_number = interaction.particle_interaction_number;
+                    return particle_node_interaction;
+                };
+
                 auto begin = interactionAcc.begin() + 16 * idx[0];
-                interpolator.generate_particle_node_interactions(idx[0], p, begin);
+
+                interpolator.generate_particle_node_interactions(p, begin, converter);
                 //ParticleNodeInteraction<Double2DCoordinateConfiguration> interaction;
                 //interaction.particle_id = 100;
                 // *(interactionAcc.begin()) = interaction;
@@ -123,7 +135,7 @@ TEST_CASE( "Interpolation test", "[Interpolation]" )
     using namespace iceSYCL;
 
     using Cubic2d = CubicInterpolationScheme<Double2DCoordinateConfiguration>;
-    using Interactions = ParticleNodeInteraction<Cubic2d::CoordinateConfiguration>;
+    using Interactions = Cubic2d::Interaction;
 
     std::array<Cubic2d::scalar_t, Cubic2d::num_interactions_per_particle> node_masses;
 
@@ -134,7 +146,7 @@ TEST_CASE( "Interpolation test", "[Interpolation]" )
 
     Cubic2d interpolator;
     interpolator.h = 1.0;
-    interpolator.generate_particle_node_interactions(0, p, interactions.begin());
+    interpolator.generate_particle_node_interactions(p, interactions.begin());
 
     Cubic2d::scalar_t total_mass = 0;
     for(auto interaction : interactions)

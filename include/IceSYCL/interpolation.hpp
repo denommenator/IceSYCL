@@ -29,6 +29,13 @@ public:
     using scalar_t = typename CoordinateConfiguration::scalar_t;
     using NodeIndex_t = typename CoordinateConfiguration::NodeIndex_t;
     using Coordinate_t = typename CoordinateConfiguration::Coordinate_t;
+
+    struct Interaction
+    {
+        NodeIndex_t node_index;
+        int particle_interaction_number;
+    };
+
     static constexpr int Dimension = CoordinateConfiguration::Dimension;
 
     static constexpr int _num_interactions_per_dimension = 4;
@@ -36,22 +43,27 @@ public:
 
     scalar_t h;
 
-    template<class InputIt>
-    void generate_particle_node_interactions(const int p_id, const Coordinate_t p, const InputIt begin) const
+    template<class InputIt, class TTransform>
+    void generate_particle_node_interactions(const Coordinate_t p, const InputIt begin, TTransform f) const
     {
         NodeIndex_t first_index = calculate_first_node(p);
         InputIt iter = begin;
 
         for(int i = 0; i < num_interactions_per_particle; ++i, ++iter)
         {
-            ParticleNodeInteraction<CoordinateConfiguration> interaction;
-            interaction.particle_id = p_id;
-            interaction.node_id = 0;
+            Interaction interaction;
             interaction.node_index = first_index + offset(i);
             interaction.particle_interaction_number = i;
 
-            *iter = interaction;
+            *iter = f(interaction);
         }
+    }
+
+    template<class InputIt>
+    void generate_particle_node_interactions(const Coordinate_t p, const InputIt begin) const
+    {
+        auto do_nothing = [](Interaction interaction){return interaction;};
+        generate_particle_node_interactions(p, begin, do_nothing);
     }
 
     scalar_t value(NodeIndex_t i, Coordinate_t x_p)
