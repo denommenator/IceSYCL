@@ -42,10 +42,10 @@ using Float3DCoordinateConfiguration = CoordinateConfiguration<float, 3>;
 template<class TCoordinateConfiguration>
 struct ParticleNodeInteraction
 {
-    int particle_id;
+    size_t particle_id;
     typename TCoordinateConfiguration::NodeIndex_t node_index;
-    int node_id;
-    int particle_interaction_number;
+    size_t node_id;
+    size_t particle_interaction_number;
 
 };
 }

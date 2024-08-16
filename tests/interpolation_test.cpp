@@ -14,8 +14,8 @@ TEST_CASE( "Interaction Generator Test", "[Interpolation]" )
     using Cubic3d = CubicInterpolationScheme<Double3DCoordinateConfiguration>;
     REQUIRE(Cubic3d::num_interactions_per_particle == 4 * 4 * 4);
 
-    Cubic2d interpolator;
-    interpolator.h = 1.0;
+    Cubic2d::scalar_t h = 1.0;
+    Cubic2d interpolator(h);
     std::array<Cubic2d::Interaction, 16> interactions;
 
     Double2DCoordinateConfiguration::Coordinate_t p = MakeCoordinate<Double2DCoordinateConfiguration>({1.0, 1.0});
@@ -52,8 +52,8 @@ TEST_CASE( "Interaction Generator Kernel Test", "[Interpolation]" )
     using namespace iceSYCL;
     using Cubic2d = CubicInterpolationScheme<Double2DCoordinateConfiguration>;
 
-    Cubic2d interpolator;
-    interpolator.h = 1.0;
+    Cubic2d::scalar_t h = 1.0;
+    Cubic2d interpolator(h);
     std::array<ParticleNodeInteraction<Double2DCoordinateConfiguration>, 32> interactions;
 
     Double2DCoordinateConfiguration::Coordinate_t p0 = MakeCoordinate<Double2DCoordinateConfiguration>({1.0, 1.0});
@@ -80,11 +80,13 @@ TEST_CASE( "Interaction Generator Kernel Test", "[Interpolation]" )
 
                 auto converter = [=](const Cubic2d::Interaction interaction)
                 {
-                    ParticleNodeInteraction<Cubic2d::CoordinateConfiguration> particle_node_interaction;
-                    particle_node_interaction.node_id = 0;
-                    particle_node_interaction.node_index = interaction.node_index;
-                    particle_node_interaction.particle_id = idx[0];
-                    particle_node_interaction.particle_interaction_number = interaction.particle_interaction_number;
+                    ParticleNodeInteraction<Cubic2d::CoordinateConfiguration> particle_node_interaction =
+                        {
+                            0,
+                            interaction.node_index,
+                            idx[0],
+                            interaction.particle_interaction_number
+                        };
                     return particle_node_interaction;
                 };
 
@@ -144,8 +146,8 @@ TEST_CASE( "Interpolation test", "[Interpolation]" )
     auto p = MakeCoordinate<Cubic2d::CoordinateConfiguration>({2.5, 2.5});
     Cubic2d::scalar_t p_mass = 1.0;
 
-    Cubic2d interpolator;
-    interpolator.h = 1.0;
+    Cubic2d::scalar_t h = 1.0;
+    Cubic2d interpolator(h);
     interpolator.generate_particle_node_interactions(p, interactions.begin());
 
     Cubic2d::scalar_t total_mass = 0;

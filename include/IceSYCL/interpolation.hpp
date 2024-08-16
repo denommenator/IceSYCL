@@ -30,10 +30,13 @@ public:
     using NodeIndex_t = typename CoordinateConfiguration::NodeIndex_t;
     using Coordinate_t = typename CoordinateConfiguration::Coordinate_t;
 
+    explicit CubicInterpolationScheme(scalar_t h_grid_spacing) : h{h_grid_spacing}
+    {}
+
     struct Interaction
     {
         NodeIndex_t node_index;
-        int particle_interaction_number;
+        size_t particle_interaction_number;
     };
 
     static constexpr int Dimension = CoordinateConfiguration::Dimension;
@@ -49,11 +52,13 @@ public:
         NodeIndex_t first_index = calculate_first_node(p);
         InputIt iter = begin;
 
-        for(int i = 0; i < num_interactions_per_particle; ++i, ++iter)
+        for(size_t i = 0; i < num_interactions_per_particle; ++i, ++iter)
         {
-            Interaction interaction;
-            interaction.node_index = first_index + offset(i);
-            interaction.particle_interaction_number = i;
+            Interaction interaction =
+                {
+                    first_index + offset(i),
+                    i
+                };
 
             *iter = f(interaction);
         }
@@ -62,8 +67,19 @@ public:
     template<class InputIt>
     void generate_particle_node_interactions(const Coordinate_t p, const InputIt begin) const
     {
-        auto do_nothing = [](Interaction interaction){return interaction;};
-        generate_particle_node_interactions(p, begin, do_nothing);
+        NodeIndex_t first_index = calculate_first_node(p);
+        InputIt iter = begin;
+
+        for(size_t i = 0; i < num_interactions_per_particle; ++i, ++iter)
+        {
+            Interaction interaction =
+                {
+                first_index + offset(i),
+                i
+            };
+
+            *iter = interaction;
+        }
     }
 
     scalar_t value(NodeIndex_t i, Coordinate_t x_p)
