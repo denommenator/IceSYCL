@@ -3,6 +3,9 @@
 //
 #define CATCH_CONFIG_MAIN
 #include <catch2/catch.hpp>
+
+#include <sycl/sycl.hpp>
+
 #include <IceSYCL/interpolation.hpp>
 
 TEST_CASE( "Interaction Generator Test", "[Interpolation]" )
@@ -82,9 +85,9 @@ TEST_CASE( "Interaction Generator Kernel Test", "[Interpolation]" )
                 {
                     ParticleNodeInteraction<Cubic2d::CoordinateConfiguration> particle_node_interaction =
                         {
-                            0,
-                            interaction.node_index,
                             idx[0],
+                            interaction.node_index,
+                            0,
                             interaction.particle_interaction_number
                         };
                     return particle_node_interaction;

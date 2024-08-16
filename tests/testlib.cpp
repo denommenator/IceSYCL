@@ -3,7 +3,13 @@
 //
 #define CATCH_CONFIG_MAIN
 #include <catch2/catch.hpp>
+
+#include <sycl/sycl.hpp>
+
+#include <oneapi/dpl/execution>
+#include <oneapi/dpl/iterator>
 #include <oneapi/dpl/algorithm>
+
 #include <small_la/small_matrix.hpp>
 
 template<class iterator_t>
@@ -25,8 +31,8 @@ TEST_CASE( "GPU Sort check", "[main]" ) {
     auto gpu = sycl::device(sycl::gpu_selector_v);
     std::cout << gpu.get_info<sycl::info::device::name>() << std::endl;
 
-    dpl::execution::make_device_policy(gpu);
-    std::sort(vec.begin(), vec.end());
+    auto policy = dpl::execution::make_device_policy(gpu);
+    oneapi::dpl::sort(policy, vec.begin(), vec.end(), 42);
     REQUIRE( vec[0] == 0 );
     REQUIRE( vec[1] == 1 );
     REQUIRE( vec[2] == 2 );
