@@ -60,38 +60,39 @@ template<class Input_t, class BinaryPred>
     });
 }
 
-template<class ExecutionPolicy, class InputIt, class OutputIt, class BinaryPred>
-    void segment_id(
-        ExecutionPolicy exec,
-        InputIt first,
-        InputIt last,
-        OutputIt d_first,
-        BinaryPred p
-    )
-{
-    auto are_different_pair = [=](typename std::iterator_traits<InputIt>::value_type a, typename std::iterator_traits<InputIt>::value_type b)->size_t
-    {
-        return p(a, b) ? 0 : 1;
-    };
-
-    oneapi::dpl::zip_iterator adjacent = dpl::make_zip_iterator(first, dpl::next(first));
-    using zip_t = decltype(adjacent);
-
-    auto are_different_zip = [=](typename std::iterator_traits<zip_t>::value_type zipped_adjacent)->size_t
-    {
-        return are_different_pair(oneapi::dpl::get<0>(zipped_adjacent), oneapi::dpl::get<1>(zipped_adjacent));
-    };
-
-    oneapi::dpl::transform_iterator are_different_it = oneapi::dpl::make_transform_iterator(adjacent, are_different_zip);
-
-    dpl::exclusive_scan(
-        exec,
-        are_different_it,
-        are_different_it + (last - first),
-        d_first,
-        0
-    );
-}
+///TODO use ranges api to make a generic version of id_segments
+// template<class ExecutionPolicy, class InputIt, class OutputIt, class BinaryPred>
+//     void segment_id(
+//         ExecutionPolicy exec,
+//         InputIt first,
+//         InputIt last,
+//         OutputIt d_first,
+//         BinaryPred p
+//     )
+// {
+//     auto are_different_pair = [=](typename std::iterator_traits<InputIt>::value_type a, typename std::iterator_traits<InputIt>::value_type b)->size_t
+//     {
+//         return p(a, b) ? 0 : 1;
+//     };
+//
+//     oneapi::dpl::zip_iterator adjacent = dpl::make_zip_iterator(first, dpl::next(first));
+//     using zip_t = decltype(adjacent);
+//
+//     auto are_different_zip = [=](typename std::iterator_traits<zip_t>::value_type zipped_adjacent)->size_t
+//     {
+//         return are_different_pair(oneapi::dpl::get<0>(zipped_adjacent), oneapi::dpl::get<1>(zipped_adjacent));
+//     };
+//
+//     oneapi::dpl::transform_iterator are_different_it = oneapi::dpl::make_transform_iterator(adjacent, are_different_zip);
+//
+//     dpl::exclusive_scan(
+//         exec,
+//         are_different_it,
+//         are_different_it + (last - first),
+//         d_first,
+//         0
+//     );
+// }
 
 template<class TInterpolationScheme>
 class ParticleNodeInteractionManager
@@ -112,16 +113,16 @@ public:
 
     ParticleNodeInteractionManager(const size_t particle_count) :
     particle_count_{particle_count},
-    interactions_by_particle_{particle_count},
-    interactions_by_node_{particle_count},
-    node_id_by_node_interaction{particle_count},
-    segment_begin{particle_count}
+    particle_node_interaction_count_{particle_count * InterpolationScheme::num_interactions_per_particle},
+    interactions_by_particle_{particle_node_interaction_count_},
+    interactions_by_node_{particle_node_interaction_count_},
+    node_id_by_node_interaction{particle_node_interaction_count_},
+    segment_begin{particle_node_interaction_count_}
     {
-        sycl::host_accessor segment_begin_acc(segment_begin);
-        std::fill(oneapi::dpl::begin(segment_begin_acc), oneapi::dpl::end(segment_begin_acc), 0);
     }
 
     size_t particle_count_;
+    size_t particle_node_interaction_count_;
     sycl::buffer<ParticleNodeInteraction<CoordinateConfiguration>> interactions_by_particle_;
     sycl::buffer<ParticleNodeInteraction<CoordinateConfiguration>> interactions_by_node_;
 
@@ -145,7 +146,7 @@ public:
             {
                 Coordinate_t p = particle_locations_acc[i];
                 const size_t pid = i[0];
-                auto interactions_begin = interactions_by_particle_acc.begin() + i[0] * InterpolationScheme::num_interactions_per_particle;
+                auto interactions_begin = interactions_by_particle_acc.begin() + pid * InterpolationScheme::num_interactions_per_particle;
 
                 auto converter = [=](typename InterpolationScheme::Interaction interaction)
                 {
@@ -161,7 +162,7 @@ public:
 
         auto dpl_policy = dpl::execution::make_device_policy<class ParticleNodeInteractionGenerationPolicy>(q);
 
-        auto node_index_comparer = [](NodeIndex_t& a, NodeIndex_t& b)->bool
+        auto node_index_comparer = [](const NodeIndex_t& a, const NodeIndex_t& b)->bool
         {
             for(size_t dim = 0; dim < CoordinateConfiguration::Dimension; dim++)
             {
@@ -173,7 +174,7 @@ public:
             return false;
         };
 
-        auto interaction_comparer = [=](ParticleNodeInteraction<CoordinateConfiguration>& a, ParticleNodeInteraction<CoordinateConfiguration>& b)->bool
+        auto interaction_comparer = [=](const ParticleNodeInteraction<CoordinateConfiguration>& a, const ParticleNodeInteraction<CoordinateConfiguration>& b)->bool
         {
             return node_index_comparer(a.node_index, b.node_index);
         };
@@ -183,7 +184,7 @@ public:
             dpl::end(interactions_by_particle_),
             dpl::begin(interactions_by_node_));
 
-        /*
+
         oneapi::dpl::sort(dpl_policy,
             dpl::begin(interactions_by_node_),
             dpl::end(interactions_by_node_),
@@ -191,23 +192,27 @@ public:
         );
 
 
+        auto is_different_node_in_interaction = [=](ParticleNodeInteraction<CoordinateConfiguration>& a, ParticleNodeInteraction<CoordinateConfiguration>& b)->bool
+        {
+            return a.node_index == b.node_index;
+        };
 
-
-        segment_id(dpl_policy,
-            dpl::begin(interactions_by_node_),
-            dpl::end(interactions_by_node_),
+        id_segments(q,
+            interactions_by_node_,
+            segment_begin,
             node_id_by_node_interaction,
             is_different_node_in_interaction);
-        */
+
 
 
     }
 
 
 
-    size_t get_node_count()
+    size_t get_node_count_host()
     {
-        return 0;
+        sycl::host_accessor node_id_by_node_interaction_acc(node_id_by_node_interaction);
+        return (*std::prev(node_id_by_node_interaction_acc.end())) + 1;
     }
 
 private:

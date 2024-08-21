@@ -12,6 +12,7 @@
 
 #include <sycl/sycl.hpp>
 
+#include <IceSYCL/coordinates.hpp>
 #include <IceSYCL/interpolation.hpp>
 #include <IceSYCL/particle_node_interactions.hpp>
 
@@ -405,25 +406,113 @@ TEST_CASE( "segment_id function test", "[particle_node_interactions]" )
 }
 */
 
+TEST_CASE( "NodeIndex sorting test", "[particle_node_interactions]" )
+{
+    using namespace iceSYCL;
+    using CoordinateConfiguration = Double2DCoordinateConfiguration;
+    using NodeIndex_t = CoordinateConfiguration::NodeIndex_t;
+    std::vector<NodeIndex_t> nodes = {
+        MakeNodeIndex<CoordinateConfiguration>({1, 1}),
+        MakeNodeIndex<CoordinateConfiguration>({0, 1}),
+        MakeNodeIndex<CoordinateConfiguration>({0, 0}),
+    };
+
+    std::vector<NodeIndex_t> nodes_desired = {
+        MakeNodeIndex<CoordinateConfiguration>({0, 0}),
+        MakeNodeIndex<CoordinateConfiguration>({0, 1}),
+        MakeNodeIndex<CoordinateConfiguration>({1, 1}),
+    };
+
+    auto node_index_comparer = [](NodeIndex_t& a, NodeIndex_t& b)->bool
+    {
+        for(size_t dim = 0; dim < CoordinateConfiguration::Dimension; dim++)
+        {
+            if(a(dim) < b(dim))
+                return true;
+            else if(a(dim) > b(dim))
+                return false;
+        }
+        return false;
+    };
+
+    std::sort(nodes.begin(), nodes.end(), node_index_comparer);
+
+    for(size_t i = 0; i < nodes.size(); i++)
+    {
+        REQUIRE(nodes[i] == nodes_desired[i]);
+    }
+
+}
+
 TEST_CASE( "Particle Node Interaction test", "[particle_node_interactions]" )
 {
     using namespace iceSYCL;
     using Cubic2d = CubicInterpolationScheme<Double2DCoordinateConfiguration>;
 
-    size_t particle_count = 1;
-    std::array<Cubic2d::Coordinate_t, 1> particles =
-        {
-        MakeCoordinate<Cubic2d::CoordinateConfiguration>({0.0, 0.0})
-        };
-    sycl::buffer particles_B(particles);
+    size_t particle_count = 2;
 
+
+    sycl::queue q(sycl::gpu_selector_v);
     const Cubic2d::scalar_t h = 1.0;
     Cubic2d interpolator{h};
-
     ParticleNodeInteractionManager<Cubic2d> pni(particle_count);
-    sycl::queue q(sycl::gpu_selector_v);
-    pni.generate_particle_node_interactions(q, particles_B, interpolator);
-    q.wait();
+
+    {
+        std::vector<Cubic2d::Coordinate_t> particles_16_nodes =
+        {
+            MakeCoordinate<Cubic2d::CoordinateConfiguration>({0.0, 0.0}),
+            MakeCoordinate<Cubic2d::CoordinateConfiguration>({0.0, 0.0}),
+        };
+        sycl::buffer particles_B(particles_16_nodes);
+
+        pni.generate_particle_node_interactions(q, particles_B, interpolator);
+        q.wait();
+
+        REQUIRE(pni.get_node_count_host() == 16);
+    }
+
+    {
+        std::vector<Cubic2d::Coordinate_t> particles_20_nodes =
+        {
+            MakeCoordinate<Cubic2d::CoordinateConfiguration>({0.0, 0.0}),
+            MakeCoordinate<Cubic2d::CoordinateConfiguration>({1.0, 0.0}),
+        };
+        sycl::buffer particles_B(particles_20_nodes);
+
+        pni.generate_particle_node_interactions(q, particles_B, interpolator);
+        q.wait();
+
+        REQUIRE(pni.get_node_count_host() == 20);
+    }
+
+    {
+        std::vector<Cubic2d::Coordinate_t> particles_23_nodes =
+        {
+            MakeCoordinate<Cubic2d::CoordinateConfiguration>({0.0, 0.0}),
+            MakeCoordinate<Cubic2d::CoordinateConfiguration>({1.0, 1.0}),
+        };
+        sycl::buffer particles_B(particles_23_nodes);
+
+        pni.generate_particle_node_interactions(q, particles_B, interpolator);
+        q.wait();
+
+        REQUIRE(pni.get_node_count_host() == 23);
+    }
+
+    {
+        std::vector<Cubic2d::Coordinate_t> particles_32_nodes =
+        {
+            MakeCoordinate<Cubic2d::CoordinateConfiguration>({0.0, 0.0}),
+            MakeCoordinate<Cubic2d::CoordinateConfiguration>({5.0, 5.0}),
+        };
+        sycl::buffer particles_B(particles_32_nodes);
+
+        pni.generate_particle_node_interactions(q, particles_B, interpolator);
+        q.wait();
+
+        REQUIRE(pni.get_node_count_host() == 32);
+    }
+
 
 
 

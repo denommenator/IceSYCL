@@ -31,6 +31,14 @@ MakeCoordinate(std::array<typename CoordinateConfiguration::scalar_t, Coordinate
     (entries);
 }
 
+template<class CoordinateConfiguration>
+typename CoordinateConfiguration::NodeIndex_t
+MakeNodeIndex(std::array<int, CoordinateConfiguration::Dimension> entries)
+{
+    return small_la::MakeVector<int, CoordinateConfiguration::Dimension>
+    (entries);
+}
+
 using Double2DCoordinateConfiguration = CoordinateConfiguration<double, 2>;
 using Float2DCoordinateConfiguration = CoordinateConfiguration<float, 2>;
 using Double3DCoordinateConfiguration = CoordinateConfiguration<double, 3>;

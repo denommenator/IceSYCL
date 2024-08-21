@@ -32,7 +32,7 @@ TEST_CASE( "GPU Sort check", "[main]" ) {
     std::cout << gpu.get_info<sycl::info::device::name>() << std::endl;
 
     auto policy = dpl::execution::make_device_policy(gpu);
-    oneapi::dpl::sort(policy, vec.begin(), vec.end(), 42);
+    oneapi::dpl::sort(policy, vec.begin(), vec.end());
     REQUIRE( vec[0] == 0 );
     REQUIRE( vec[1] == 1 );
     REQUIRE( vec[2] == 2 );
