@@ -104,12 +104,14 @@ public:
     using NodeIndex_t = typename CoordinateConfiguration::NodeIndex_t;
     using Coordinate_t = typename CoordinateConfiguration::Coordinate_t;
 
+
     struct NodeData
     {
         NodeIndex_t node_index;
         size_t particle_interaction_begin;
         size_t particle_interaction_count;
     };
+    using NodeData_t = NodeData;
 
     ParticleNodeInteractionManager(const size_t particle_count) :
     particle_count_{particle_count},
@@ -117,7 +119,9 @@ public:
     interactions_by_particle_{particle_node_interaction_count_},
     interactions_by_node_{particle_node_interaction_count_},
     node_id_by_node_interaction{particle_node_interaction_count_},
-    segment_begin{particle_node_interaction_count_}
+    segment_begin{particle_node_interaction_count_},
+    node_count{1},
+    node_data_{particle_node_interaction_count_}
     {
     }
 
@@ -125,16 +129,35 @@ public:
     size_t particle_node_interaction_count_;
     sycl::buffer<ParticleNodeInteraction<CoordinateConfiguration>> interactions_by_particle_;
     sycl::buffer<ParticleNodeInteraction<CoordinateConfiguration>> interactions_by_node_;
+    sycl::buffer<NodeData> node_data_;
 
     sycl::buffer<size_t> segment_begin;
     sycl::buffer<size_t> node_id_by_node_interaction;
+    sycl::buffer<size_t> node_count;
 
 
-
-    void generate_particle_node_interactions(
-        sycl::queue q,
+    void update_particle_locations(
+        sycl::queue& q,
         sycl::buffer<Coordinate_t>& particle_locations,
-        const InterpolationScheme interpolator
+        const InterpolationScheme& interpolator
+    )
+    {
+        generate_particle_node_interactions(q, particle_locations, interpolator);
+        identify_nodes(q);
+        populate_node_data(q);
+    }
+
+    size_t get_node_count_host()
+    {
+        sycl::host_accessor node_count_acc(node_count);
+        return (*std::prev(node_count_acc.end()));
+    }
+
+private:
+    void generate_particle_node_interactions(
+        sycl::queue& q,
+        sycl::buffer<Coordinate_t>& particle_locations,
+        const InterpolationScheme& interpolator
     )
     {
         q.submit([&](sycl::handler& h)
@@ -157,10 +180,19 @@ public:
             });
 
         });
+    }
 
-
-
+    void identify_nodes(
+            sycl::queue& q
+        )
+    {
         auto dpl_policy = dpl::execution::make_device_policy<class ParticleNodeInteractionGenerationPolicy>(q);
+        oneapi::dpl::copy(dpl_policy,
+            dpl::begin(interactions_by_particle_),
+            dpl::end(interactions_by_particle_),
+            dpl::begin(interactions_by_node_));
+
+
 
         auto node_index_comparer = [](const NodeIndex_t& a, const NodeIndex_t& b)->bool
         {
@@ -179,10 +211,7 @@ public:
             return node_index_comparer(a.node_index, b.node_index);
         };
 
-        oneapi::dpl::copy(dpl_policy,
-            dpl::begin(interactions_by_particle_),
-            dpl::end(interactions_by_particle_),
-            dpl::begin(interactions_by_node_));
+
 
 
         oneapi::dpl::sort(dpl_policy,
@@ -203,17 +232,83 @@ public:
             node_id_by_node_interaction,
             is_different_node_in_interaction);
 
-
+        q.submit([&](sycl::handler& h)
+        {
+            sycl::accessor node_id_by_node_interaction_acc(node_id_by_node_interaction, h);
+            sycl::accessor node_count_acc(node_count, h);
+            h.single_task([=](){node_count_acc[0] = (*std::prev(node_id_by_node_interaction_acc.end())) + 1;});
+        });
 
     }
 
-
-
-    size_t get_node_count_host()
+    void populate_node_data(sycl::queue& q)
     {
-        sycl::host_accessor node_id_by_node_interaction_acc(node_id_by_node_interaction);
-        return (*std::prev(node_id_by_node_interaction_acc.end())) + 1;
+        q.submit([&](sycl::handler& h)
+        {
+            sycl::accessor node_id_by_node_interaction_acc(node_id_by_node_interaction, h);
+            sycl::accessor interactions_by_node_acc(interactions_by_node_, h);
+            sycl::accessor node_data_acc(node_data_, h);
+            sycl::accessor interactions_by_particle_acc(interactions_by_particle_, h);
+            sycl::accessor is_segment_begin_acc(segment_begin, h);
+
+            h.parallel_for(particle_node_interaction_count_,
+                [=](sycl::id<1> idx)
+                {
+                    ParticleNodeInteraction<CoordinateConfiguration>& interaction = interactions_by_node_acc[idx];
+                    size_t node_id = node_id_by_node_interaction_acc[idx];
+                    interaction.node_id = node_id;
+
+                    size_t particle_interaction_offset = interaction.particle_id * InterpolationScheme::num_interactions_per_particle + interaction.particle_interaction_number;
+                    interactions_by_particle_acc[particle_interaction_offset].node_id = node_id;
+
+                    if(is_segment_begin_acc[idx])
+                    {
+                        NodeData node_data = {
+                           interaction.node_index,
+                           idx[0],
+                           0
+                       };
+                       node_data_acc[node_id] = node_data;
+                    }
+                });
+
+        });
+
+        q.submit([&](sycl::handler& h)
+        {
+            sycl::accessor node_data_acc(node_data_, h);
+            sycl::accessor node_count_acc(node_count, h);
+
+            //TODO figure out how to do dynamic dispatch sizes based on GPU buffer data
+            size_t particle_node_interaction_count = particle_node_interaction_count_;
+            h.parallel_for(particle_node_interaction_count_,
+                [=](sycl::id<1> idx)
+                {
+                    size_t node_id = idx[0];
+                    size_t num_nodes = node_count_acc[0];
+                    if(node_id >= num_nodes)
+                        return;
+
+                    size_t node_interaction_begin = node_data_acc[node_id].particle_interaction_begin;
+                    if(node_id < num_nodes - 1)
+                    {
+
+                        size_t node_interaction_begin_next = node_data_acc[node_id + 1].particle_interaction_begin;
+                        node_data_acc[node_id].particle_interaction_count = node_interaction_begin_next - node_interaction_begin;
+                    }
+                    else
+                    {
+                        node_data_acc[node_id].particle_interaction_count = particle_node_interaction_count - node_interaction_begin;
+                    }
+                });
+
+        });
+
     }
+
+
+
+
 
 private:
     static ParticleNodeInteraction<CoordinateConfiguration> local_interaction_to_global(

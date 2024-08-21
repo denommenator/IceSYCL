@@ -465,7 +465,7 @@ TEST_CASE( "Particle Node Interaction test", "[particle_node_interactions]" )
         };
         sycl::buffer particles_B(particles_16_nodes);
 
-        pni.generate_particle_node_interactions(q, particles_B, interpolator);
+        pni.update_particle_locations(q, particles_B, interpolator);
         q.wait();
 
         REQUIRE(pni.get_node_count_host() == 16);
@@ -479,7 +479,7 @@ TEST_CASE( "Particle Node Interaction test", "[particle_node_interactions]" )
         };
         sycl::buffer particles_B(particles_20_nodes);
 
-        pni.generate_particle_node_interactions(q, particles_B, interpolator);
+        pni.update_particle_locations(q, particles_B, interpolator);
         q.wait();
 
         REQUIRE(pni.get_node_count_host() == 20);
@@ -493,7 +493,7 @@ TEST_CASE( "Particle Node Interaction test", "[particle_node_interactions]" )
         };
         sycl::buffer particles_B(particles_23_nodes);
 
-        pni.generate_particle_node_interactions(q, particles_B, interpolator);
+        pni.update_particle_locations(q, particles_B, interpolator);
         q.wait();
 
         REQUIRE(pni.get_node_count_host() == 23);
@@ -507,11 +507,87 @@ TEST_CASE( "Particle Node Interaction test", "[particle_node_interactions]" )
         };
         sycl::buffer particles_B(particles_32_nodes);
 
-        pni.generate_particle_node_interactions(q, particles_B, interpolator);
+        pni.update_particle_locations(q, particles_B, interpolator);
         q.wait();
 
         REQUIRE(pni.get_node_count_host() == 32);
     }
+
+
+
+
+
+}
+
+TEST_CASE( "Particle Node Interaction node interaction data test", "[particle_node_interactions]" )
+{
+    using namespace iceSYCL;
+    using Cubic2d = CubicInterpolationScheme<Double2DCoordinateConfiguration>;
+    using NodeData_t = ParticleNodeInteractionManager<Cubic2d>::NodeData_t;
+
+    size_t particle_count = 3;
+
+
+    sycl::queue q(sycl::gpu_selector_v);
+    const Cubic2d::scalar_t h = 1.0;
+    Cubic2d interpolator{h};
+    ParticleNodeInteractionManager<Cubic2d> pni(particle_count);
+
+    {
+        std::vector<Cubic2d::Coordinate_t> particles_16_nodes =
+        {
+            MakeCoordinate<Cubic2d::CoordinateConfiguration>({0.0, 0.0}),
+            MakeCoordinate<Cubic2d::CoordinateConfiguration>({0.0, 0.0}),
+            MakeCoordinate<Cubic2d::CoordinateConfiguration>({0.0, 0.0}),
+        };
+        sycl::buffer particles_B(particles_16_nodes);
+
+        pni.update_particle_locations(q, particles_B, interpolator);
+        q.wait();
+
+        sycl::host_accessor node_data_acc(pni.node_data_);
+        sycl::host_accessor interactions_by_node_acc(pni.interactions_by_node_);
+        sycl::host_accessor interactions_by_particle_acc(pni.interactions_by_particle_);
+
+        // std::cout << "interactions by node" << std::endl;
+        // for(int i = 0; i < interactions_by_node_acc.size(); ++i)
+        // {
+        //     auto interaction = interactions_by_node_acc[i];
+        //     std::cout << i << ", " << interaction.node_id << ", " << interaction.particle_id << ", " << interaction.particle_interaction_number << ", " << std::endl;
+        //     //CAPTURE(i, interaction.node_id, interaction.particle_id, interaction.particle_interaction_number);
+        // }
+        //
+        // std::cout << "node datas" << std::endl;
+        // for(size_t node_id = 0; node_id < node_data_acc.size(); ++node_id)
+        // {
+        //     NodeData_t node_data = node_data_acc[node_id];
+        //     std::cout << node_data.particle_interaction_begin << ", " << node_data.particle_interaction_count << std::endl;
+        //     //CAPTURE(node_id, node_data.particle_interaction_begin, node_data.particle_interaction_count);
+        // }
+
+
+        size_t num_nodes = pni.get_node_count_host();
+        for(size_t node_id = 0; node_id < num_nodes; ++node_id)
+        {
+            NodeData_t node_data = node_data_acc[node_id];
+            CHECK(node_data.particle_interaction_begin == 3 * node_id);
+            CHECK(node_data.particle_interaction_count == 3);
+            for(size_t i = 0; i < node_data.particle_interaction_count; i++)
+            {
+                auto interaction = interactions_by_node_acc[node_data.particle_interaction_begin + i];
+                CHECK(interaction.node_id == node_id);
+
+                auto interaction_particle = interactions_by_particle_acc[interaction.particle_id * Cubic2d::num_interactions_per_particle + interaction.particle_interaction_number];
+                CHECK(interaction_particle.node_id == node_id);
+                CHECK(interaction_particle.node_index == interaction.node_index);
+                CHECK(interaction_particle.particle_id == interaction.particle_id);
+                CHECK(interaction_particle.particle_interaction_number == interaction.particle_interaction_number);
+            }
+        }
+
+
+    }
+
 
 
 
