@@ -11,6 +11,8 @@
 #include <oneapi/dpl/iterator>
 #include <oneapi/dpl/algorithm>
 
+#include "kernel_access_abstraction.hpp"
+
 #include "coordinates.hpp"
 #include "interpolation.hpp"
 
@@ -333,6 +335,7 @@ private:
 
 public:
 
+    template<bool TIsDevice>
     struct KernelAccessor
     {
         using interaction_iterator_t = typename sycl::accessor<ParticleNodeInteraction<CoordinateConfiguration>>::iterator;
@@ -375,14 +378,15 @@ public:
 
 
 
-        sycl::accessor<ParticleNodeInteraction<CoordinateConfiguration>> interactions_by_particle_acc;
-        sycl::accessor<ParticleNodeInteraction<CoordinateConfiguration>> interactions_by_node_acc;
-        sycl::accessor<NodeData> node_data_acc;
+        Accessor_t<ParticleNodeInteraction<CoordinateConfiguration>, TIsDevice> interactions_by_particle_acc;
+        Accessor_t<ParticleNodeInteraction<CoordinateConfiguration>, TIsDevice> interactions_by_node_acc;
+        Accessor_t<NodeData, TIsDevice> node_data_acc;
 
-        sycl::accessor<size_t> node_count_acc;
+        Accessor_t<size_t, TIsDevice> node_count_acc;
     };
 
-    KernelAccessor kernel_accessor;
+    KernelAccessor<true> kernel_accessor;
+    KernelAccessor<false> host_accessor;
 
 
 };
