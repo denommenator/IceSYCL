@@ -121,10 +121,16 @@ public:
     node_id_by_node_interaction{particle_node_interaction_count_},
     segment_begin{particle_node_interaction_count_},
     node_count{1},
-    node_data_{particle_node_interaction_count_}
+    node_data_{particle_node_interaction_count_},
+    kernel_accessor{
+        interactions_by_particle_,
+        interactions_by_node_,
+        node_data_,
+        node_count
+    }
     {
     }
-
+public:
     size_t particle_count_;
     size_t particle_node_interaction_count_;
     sycl::buffer<ParticleNodeInteraction<CoordinateConfiguration>> interactions_by_particle_;
@@ -135,7 +141,7 @@ public:
     sycl::buffer<size_t> node_id_by_node_interaction;
     sycl::buffer<size_t> node_count;
 
-
+public:
     void update_particle_locations(
         sycl::queue& q,
         sycl::buffer<Coordinate_t>& particle_locations,
@@ -324,38 +330,61 @@ private:
             };
         return ret;
     }
-/*
-    void mark_interaction_by_node_segments(sycl::queue q)
+
+public:
+
+    struct KernelAccessor
     {
-        auto is_equal = [](NodeIndex_t& a, NodeIndex_t& b)->bool
+        using interaction_iterator_t = typename sycl::accessor<ParticleNodeInteraction<CoordinateConfiguration>>::iterator;
+        void give_kernel_access(sycl::handler& h)
         {
-            for(size_t dim = 0; dim < CoordinateConfiguration::Dimension; dim++)
-            {
-                if(a(dim) != b(dim))
-                    return false;
-            }
-            return true;
-        };
+            h.require(interactions_by_particle_acc);
+            h.require(interactions_by_node_acc);
+            h.require(node_data_acc);
 
-        auto is_different_node_in_interaction = [=](ParticleNodeInteraction<CoordinateConfiguration>& a, ParticleNodeInteraction<CoordinateConfiguration>& b)->size_t
+            h.require(node_count_acc);
+        }
+
+        interaction_iterator_t particle_interactions_begin(size_t pid) const
         {
-            return is_equal(a.node_index, b.node_index) ? 0 : 1;
-        };
+            return interactions_by_particle_acc.begin() + pid * InterpolationScheme::num_interactions_per_particle;
+        }
 
-        q.submit([&](sycl::handler h)
+        interaction_iterator_t particle_interactions_end(size_t pid) const
         {
-            sycl::accessor interactions_by_node_acc(interactions_by_node_, h);
-            sycl::accessor segment_begin_acc(segment_begin, h);
+            return interactions_by_particle_acc.begin() + (pid + 1) * InterpolationScheme::num_interactions_per_particle;
+        }
 
-            q.parallel_for(particle_count_ - 1, [=](sycl::id<1> idx)
-            {
+        interaction_iterator_t node_interactions_begin(size_t node_id) const
+        {
+            size_t begin = node_data_acc[node_id].particle_interaction_begin;
+            return interactions_by_node_acc.begin() + begin;
+        }
 
-            });
+        interaction_iterator_t node_interactions_end(size_t node_id) const
+        {
+            size_t begin = node_data_acc[node_id].particle_interaction_begin;
+            size_t count = node_data_acc[node_id].particle_interaction_count;
+            return interactions_by_node_acc.begin() + begin + count;
+        }
 
-        });
+        const size_t node_count() const
+        {
+            return node_count_acc[0];
+        }
 
-    }
-*/
+
+
+        sycl::accessor<ParticleNodeInteraction<CoordinateConfiguration>> interactions_by_particle_acc;
+        sycl::accessor<ParticleNodeInteraction<CoordinateConfiguration>> interactions_by_node_acc;
+        sycl::accessor<NodeData> node_data_acc;
+
+        sycl::accessor<size_t> node_count_acc;
+    };
+
+    KernelAccessor kernel_accessor;
+
+
 };
 
 }

@@ -594,3 +594,94 @@ TEST_CASE( "Particle Node Interaction node interaction data test", "[particle_no
 
 
 }
+
+
+TEST_CASE( "kernel data accessor test", "[particle_node_interactions]" )
+{
+    using namespace iceSYCL;
+    using Cubic2d = CubicInterpolationScheme<Double2DCoordinateConfiguration>;
+    using NodeData_t = ParticleNodeInteractionManager<Cubic2d>::NodeData_t;
+
+    size_t particle_count = 3;
+
+
+    std::vector<size_t> success = {1};
+
+    sycl::queue q(sycl::gpu_selector_v);
+    const Cubic2d::scalar_t h = 1.0;
+    Cubic2d interpolator{h};
+    ParticleNodeInteractionManager<Cubic2d> pni(particle_count);
+
+    {
+        sycl::buffer successB(success);
+        std::vector<Cubic2d::Coordinate_t> particles_16_nodes =
+        {
+            MakeCoordinate<Cubic2d::CoordinateConfiguration>({0.0, 0.0}),
+            MakeCoordinate<Cubic2d::CoordinateConfiguration>({0.0, 0.0}),
+            MakeCoordinate<Cubic2d::CoordinateConfiguration>({0.0, 0.0}),
+        };
+        sycl::buffer particles_B(particles_16_nodes);
+
+        pni.update_particle_locations(q, particles_B, interpolator);
+        q.wait();
+
+        auto interaction_access = pni.kernel_accessor;
+        size_t num_nodes = pni.get_node_count_host();
+        q.submit([&](sycl::handler& h)
+        {
+            interaction_access.give_kernel_access(h);
+
+            sycl::accessor node_data_acc(pni.node_data_, h);
+            sycl::accessor interactions_by_node_acc(pni.interactions_by_node_, h);
+            sycl::accessor interactions_by_particle_acc(pni.interactions_by_particle_, h);
+
+            sycl::accessor success_acc(successB, h);
+
+            h.single_task([=]()
+            {
+                size_t node_count_acc = interaction_access.node_count();
+                if(node_count_acc != num_nodes)
+                    success_acc[0] = 0;
+
+                size_t interaction_number = 0;
+                for(size_t node_id = 0; node_id < num_nodes; ++node_id)
+                {
+                    size_t node_interaction_begin = node_data_acc[node_id].particle_interaction_begin;
+                    size_t interaction_count = node_data_acc[node_id].particle_interaction_count;
+
+                    size_t interaction_count_access = interaction_access.node_interactions_end(node_id) - interaction_access.node_interactions_begin(node_id);
+                    if(interaction_count != interaction_count_access)
+                        success_acc[0] = 0;
+
+                    for(size_t i = 0; i < interaction_count; ++i)
+                    {
+                        auto interaction = interactions_by_node_acc[node_interaction_begin + i];
+                        auto interaction_from_access = *(interaction_access.node_interactions_begin(node_id) + i);
+                        bool is_same =
+                            interaction.node_id == interaction_from_access.node_id &&
+                                interaction.particle_id == interaction_from_access.particle_id &&
+                                    interaction.particle_interaction_number == interaction_from_access.particle_interaction_number &&
+                                        interaction.node_index == interaction_from_access.node_index;
+                        if(!is_same)
+                            success_acc[0] = 0;
+
+                    }
+
+
+
+                }
+            });
+        });
+        q.wait();
+    }
+
+
+    REQUIRE(success[0] == 1);
+
+
+
+
+
+
+
+}
