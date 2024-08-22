@@ -12,7 +12,8 @@ set(TEST_LIST
 "interpolation_test"
 "particle_node_interactions"
 "sorting"
-"accessor_abstraction")
+"accessor_abstraction"
+"engine")
 
 foreach(testVAR IN LISTS TEST_LIST)
     add_executable("${testVAR}" "${testVAR}.cpp")
