@@ -20,6 +20,7 @@ public:
     using scalar_t = Tscalar_t;
     using Coordinate_t = small_la::small_matrix<scalar_t, Dimension, 1>;
     using NodeIndex_t = small_la::small_matrix<int, Dimension, 1>;
+    using CoordinateMatrix_t = small_la::small_matrix<scalar_t, Dimension, Dimension>;
 
 };
 
