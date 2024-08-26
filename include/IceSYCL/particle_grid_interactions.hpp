@@ -97,7 +97,7 @@ template<class Input_t, class BinaryPred>
 // }
 
 template<class TInterpolationScheme>
-class ParticleNodeInteractionManager
+class ParticleGridInteractionManager
 {
 public:
     using InterpolationScheme = TInterpolationScheme;
@@ -115,7 +115,7 @@ public:
     };
     using NodeData_t = NodeData;
 
-    ParticleNodeInteractionManager(const size_t particle_count) :
+    ParticleGridInteractionManager(const size_t particle_count) :
     particle_count_{particle_count},
     particle_node_interaction_count_{particle_count * InterpolationScheme::num_interactions_per_particle},
     interactions_by_particle_{particle_node_interaction_count_},

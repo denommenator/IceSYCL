@@ -8,7 +8,7 @@
 #include "utility.hpp"
 #include "coordinates.hpp"
 #include "interpolation.hpp"
-#include "particle_node_interactions.hpp"
+#include "particle_grid_interactions.hpp"
 
 
 namespace iceSYCL
@@ -36,7 +36,7 @@ public:
     };
 
     InterpolationScheme interpolator;
-    ParticleNodeInteractionManager<InterpolationScheme> interaction_manager;
+    ParticleGridInteractionManager<InterpolationScheme> interaction_manager;
 
 public:
     static ParticleInitialState MakeInitialState(
@@ -75,10 +75,9 @@ public:
         deformation_gradients_prev{particle_count}
         {}
     public:
-        static ParticleData InitialStateFactory(
-            ParticleInitialState<CoordinateConfiguration>& initial_state)
+        static ParticleData InitialStateFactory(ParticleInitialState& initial_state)
         {
-            ParticleData ret(positions.size());
+            ParticleData ret(initial_state.positions.size());
             iceSYCL::host_copy_all(initial_state.positions, ret.positions);
             iceSYCL::host_copy_all(initial_state.positions, ret.positions_prev);
             iceSYCL::host_copy_all(initial_state.velocities, ret.velocities);
@@ -87,13 +86,14 @@ public:
             iceSYCL::host_copy_all(initial_state.rest_volumes, ret.rest_volumes);
 
             CoordinateMatrix_t Identity = CoordinateMatrix_t::Identity();
-            iceSYCL::host_fill_all(B_matrices, CoordinateMatrix_t::Zero());
-            iceSYCL::host_fill_all(deformation_gradients, CoordinateMatrix_t::Identity());
-            iceSYCL::host_fill_all(deformation_gradients_prev, CoordinateMatrix_t::Identity());
+            iceSYCL::host_fill_all(ret.B_matrices, CoordinateMatrix_t::Zero());
+            iceSYCL::host_fill_all(ret.deformation_gradients, CoordinateMatrix_t::Identity());
+            iceSYCL::host_fill_all(ret.deformation_gradients_prev, CoordinateMatrix_t::Identity());
 
             return ret;
         }
 
+        const size_t particle_count;
         sycl::buffer<Coordinate_t> positions;
         sycl::buffer<Coordinate_t> velocities;
         sycl::buffer<Coordinate_t> positions_prev;
@@ -105,7 +105,7 @@ public:
         sycl::buffer<CoordinateMatrix_t> deformation_gradients;
         sycl::buffer<CoordinateMatrix_t> deformation_gradients_helper;
         sycl::buffer<CoordinateMatrix_t> deformation_gradients_prev;
-        const size_t particle_count;
+
 
 
     };
@@ -113,7 +113,7 @@ public:
     ParticleData particle_data;
     const size_t particle_count;
 public:
-    Engine(InterpolationScheme interpolator_instance, ParticleNodeInteractionManager<InterpolationScheme>&& interaction_manager_instance, ParticleData&& particle_data) :
+    Engine(InterpolationScheme interpolator_instance, ParticleGridInteractionManager<InterpolationScheme>&& interaction_manager_instance, ParticleData&& particle_data) :
     particle_count{particle_data.particle_count},
     interpolator{interpolator_instance},
     interaction_manager{std::move(interaction_manager_instance)},

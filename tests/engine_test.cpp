@@ -10,7 +10,7 @@
 
 #include <IceSYCL/coordinates.hpp>
 #include <IceSYCL/interpolation.hpp>
-#include <IceSYCL/particle_node_interactions.hpp>
+#include <IceSYCL/particle_grid_interactions.hpp>
 #include <IceSYCL/engine.hpp>
 
 #include <vector>

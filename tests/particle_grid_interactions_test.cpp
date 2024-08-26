@@ -14,7 +14,7 @@
 
 #include <IceSYCL/coordinates.hpp>
 #include <IceSYCL/interpolation.hpp>
-#include <IceSYCL/particle_node_interactions.hpp>
+#include <IceSYCL/particle_grid_interactions.hpp>
 
 #include <vector>
 #include <functional>
@@ -455,7 +455,7 @@ TEST_CASE( "Particle Node Interaction test", "[particle_node_interactions]" )
     sycl::queue q(sycl::gpu_selector_v);
     const Cubic2d::scalar_t h = 1.0;
     Cubic2d interpolator{h};
-    ParticleNodeInteractionManager<Cubic2d> pni(particle_count);
+    ParticleGridInteractionManager<Cubic2d> pni(particle_count);
 
     {
         std::vector<Cubic2d::Coordinate_t> particles_16_nodes =
@@ -523,7 +523,7 @@ TEST_CASE( "Particle Node Interaction node interaction data test", "[particle_no
 {
     using namespace iceSYCL;
     using Cubic2d = CubicInterpolationScheme<Double2DCoordinateConfiguration>;
-    using NodeData_t = ParticleNodeInteractionManager<Cubic2d>::NodeData_t;
+    using NodeData_t = ParticleGridInteractionManager<Cubic2d>::NodeData_t;
 
     size_t particle_count = 3;
 
@@ -531,7 +531,7 @@ TEST_CASE( "Particle Node Interaction node interaction data test", "[particle_no
     sycl::queue q(sycl::gpu_selector_v);
     const Cubic2d::scalar_t h = 1.0;
     Cubic2d interpolator{h};
-    ParticleNodeInteractionManager<Cubic2d> pni(particle_count);
+    ParticleGridInteractionManager<Cubic2d> pni(particle_count);
 
     {
         std::vector<Cubic2d::Coordinate_t> particles_16_nodes =
@@ -600,7 +600,7 @@ TEST_CASE( "kernel data accessor test", "[particle_node_interactions]" )
 {
     using namespace iceSYCL;
     using Cubic2d = CubicInterpolationScheme<Double2DCoordinateConfiguration>;
-    using NodeData_t = ParticleNodeInteractionManager<Cubic2d>::NodeData_t;
+    using NodeData_t = ParticleGridInteractionManager<Cubic2d>::NodeData_t;
 
     size_t particle_count = 3;
 
@@ -610,7 +610,7 @@ TEST_CASE( "kernel data accessor test", "[particle_node_interactions]" )
     sycl::queue q(sycl::gpu_selector_v);
     const Cubic2d::scalar_t h = 1.0;
     Cubic2d interpolator{h};
-    ParticleNodeInteractionManager<Cubic2d> pni(particle_count);
+    ParticleGridInteractionManager<Cubic2d> pni(particle_count);
 
     {
         sycl::buffer successB(success);

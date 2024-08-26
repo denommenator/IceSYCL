@@ -10,10 +10,11 @@ FetchContent_MakeAvailable(catch)
 set(TEST_LIST
 "testlib"
 "interpolation_test"
-"particle_node_interactions"
-"sorting"
-"accessor_abstraction"
-"engine")
+"particle_grid_interactions_test"
+"sorting_test"
+"accessor_abstraction_test"
+"engine_test"
+"particle_grid_operations_test")
 
 foreach(testVAR IN LISTS TEST_LIST)
     add_executable("${testVAR}" "${testVAR}.cpp")
