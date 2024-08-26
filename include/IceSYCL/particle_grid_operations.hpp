@@ -19,7 +19,7 @@
 #include <IceSYCL/particle_grid_interactions.hpp>
 
 
-namespace iceSYCL
+namespace iceSYCL::particle_grid_operations
 {
 
 

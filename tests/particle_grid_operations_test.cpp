@@ -19,6 +19,8 @@
 TEST_CASE( "one particle mass interpolation test", "[particle_node_operations]" )
 {
     using namespace iceSYCL;
+    using namespace particle_grid_operations;
+
     using Cubic2d = CubicInterpolationScheme<Double2DCoordinateConfiguration>;
     using Coordinate_t = Cubic2d::Coordinate_t;
     using scalar_t = Cubic2d::scalar_t;
@@ -71,6 +73,7 @@ TEST_CASE( "one particle mass interpolation test", "[particle_node_operations]" 
 TEST_CASE( "one particle mass interpolation and back test", "[particle_node_operations]" )
 {
     using namespace iceSYCL;
+    using namespace particle_grid_operations;
     using Cubic2d = CubicInterpolationScheme<Double2DCoordinateConfiguration>;
     using Coordinate_t = Cubic2d::Coordinate_t;
     using scalar_t = Cubic2d::scalar_t;
