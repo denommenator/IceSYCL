@@ -82,29 +82,46 @@ public:
         }
     }
 
-    scalar_t value(NodeIndex_t i, Coordinate_t x_p)
+    scalar_t value(NodeIndex_t i, Coordinate_t x_p) const
     {
-        scalar_t x_i_0 = i(0) * h;
-        scalar_t x_i_1 = i(1) * h;
+        Coordinate_t x_i = position(i);
+        scalar_t ret = 1.0;
 
-        return n(1.0 / h * (x_p(0) - x_i_0))
-                * n(1.0 / h * (x_p(1) - x_i_1));
+        for(int dim = 0; dim < Dimension; ++dim)
+        {
+            ret *= n(1.0 / h * (x_p(dim) - x_i(dim)));
+        }
+
+        return ret;
     }
 
-    Coordinate_t gradient_impl(NodeIndex_t i, Coordinate_t x_p)
+    Coordinate_t gradient_impl(NodeIndex_t i, Coordinate_t x_p) const
     {
-        scalar_t x_i_0 = i(0) * h;
-        scalar_t x_i_1 = i(1) * h;
+        Coordinate_t x_i = position(i);
+        Coordinate_t ret;
+        for(int dim = 0; dim < Dimension; ++dim)
+        {
+            scalar_t ret_dim = 1.0;
+            for(int pre_dim = 0; pre_dim < dim; ++pre_dim)
+            {
+                ret_dim *= n(1.0 / h * (x_p(pre_dim) - x_i(pre_dim)));
+            }
 
-        return Coordinate(
-            1.0 / h * n_prime(1.0 / h * (x_p(0) - x_i_0)) * n(1.0 / h * (x_p(1) - x_i_1)),
-            1.0 / h * n(1.0 / h * (x_p(0) - x_i_0)) * n_prime(1.0 / h * (x_p(1) - x_i_1)));
+            ret_dim *= 1.0 / h * n_prime(1.0 / h * (x_p(dim) - x_i(dim)));
 
+            for(int post_dim = dim + 1; post_dim < Dimension; ++post_dim)
+            {
+                ret_dim *= n(1.0 / h * (x_p(post_dim) - x_i(post_dim)));
+            }
+
+            ret(dim) = ret_dim;
+        }
+        return ret;
     }
 
-    Coordinate_t position(NodeIndex_t i)
+    Coordinate_t position(NodeIndex_t i) const
     {
-        NodeIndex_t i_scalar;
+        Coordinate_t i_scalar;
         for(int dim = 0; dim < Dimension; dim++)
         {
             i_scalar(dim) = i(dim);
