@@ -339,7 +339,8 @@ public:
     struct KernelAccessor
     {
         using interaction_iterator_t = typename sycl::accessor<ParticleNodeInteraction<CoordinateConfiguration>>::iterator;
-        void give_kernel_access(sycl::handler& h)
+        template<bool TIsDevice_dummy = TIsDevice>
+        std::enable_if_t<TIsDevice_dummy, void> give_kernel_access(sycl::handler& h)
         {
             h.require(interactions_by_particle_acc);
             h.require(interactions_by_node_acc);
@@ -386,7 +387,15 @@ public:
     };
 
     KernelAccessor<true> kernel_accessor;
-    KernelAccessor<false> host_accessor;
+    KernelAccessor<false> get_host_accessor()
+    {
+        return KernelAccessor<false> {
+            interactions_by_particle_,
+            interactions_by_node_,
+            node_data_,
+            node_count
+        };
+    }
 
 
 };

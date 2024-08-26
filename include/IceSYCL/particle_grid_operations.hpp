@@ -25,12 +25,12 @@ namespace iceSYCL
 
 template<class TInterpolationScheme, class TData>
 void transfer_data_particles_to_grid(
-    sycl::queue q,
+    sycl::queue& q,
     ParticleGridInteractionManager<TInterpolationScheme>& interaction_manager,
     TInterpolationScheme interpolator,
-    sycl::buffer<TData> data_per_particle,
-    sycl::buffer<TData> data_per_node,
-    sycl::buffer<typename TInterpolationScheme::Coordinate_t> particle_positions,
+    sycl::buffer<TData>& data_per_particle,
+    sycl::buffer<TData>& data_per_node,
+    sycl::buffer<typename TInterpolationScheme::Coordinate_t>& particle_positions,
     TData zero
 )
 {
@@ -69,6 +69,55 @@ void transfer_data_particles_to_grid(
             }
 
             data_per_node_acc[node_id] = result;
+        });
+    });
+}
+
+
+template<class TInterpolationScheme, class TData>
+void transfer_data_grid_to_particles(
+    sycl::queue& q,
+    ParticleGridInteractionManager<TInterpolationScheme>& interaction_manager,
+    TInterpolationScheme interpolator,
+    sycl::buffer<TData>& data_per_node,
+    sycl::buffer<TData>& data_per_particle,
+    sycl::buffer<typename TInterpolationScheme::Coordinate_t>& particle_positions,
+    TData zero
+)
+{
+    using Coordinate_t = typename TInterpolationScheme::Coordinate_t;
+    using NodeIndex_t = typename TInterpolationScheme::NodeIndex_t;
+
+    auto interaction_access = interaction_manager.kernel_accessor;
+    q.submit([&](sycl::handler& h)
+    {
+        sycl::accessor<TData> data_per_particle_acc(data_per_particle, h);
+        sycl::accessor<TData> data_per_node_acc(data_per_node, h);
+        sycl::accessor<Coordinate_t> particle_positions_acc(particle_positions, h);
+
+        interaction_access.give_kernel_access(h);
+
+        h.parallel_for(data_per_particle_acc.size(),[=](sycl::id<1> idx)
+        {
+            size_t pid = idx[0];
+
+            TData result = zero;
+            for(auto interaction_it = interaction_access.particle_interactions_begin(pid);
+                interaction_it != interaction_access.particle_interactions_end(pid);
+                ++interaction_it)
+            {
+                ParticleNodeInteraction<typename TInterpolationScheme::CoordinateConfiguration> interaction = *interaction_it;
+                size_t node_id = interaction.node_id;
+                TData value_i = data_per_node_acc[node_id];
+
+                Coordinate_t x_p = particle_positions_acc[pid];
+
+                NodeIndex_t node_index = interaction.node_index;
+
+                result += interpolator.value(node_index, x_p) * value_i;
+            }
+
+            data_per_particle_acc[pid] = result;
         });
     });
 }

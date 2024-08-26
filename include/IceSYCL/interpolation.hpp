@@ -129,6 +129,11 @@ public:
         return h * i_scalar;
     }
 
+    scalar_t node_volume() const
+    {
+        return std::pow(h, Dimension);
+    }
+
 private:
     static scalar_t n(scalar_t x)
     {

@@ -16,3 +16,47 @@
 #include <vector>
 #include <functional>
 
+TEST_CASE( "Rest volume test", "[particle_node_operations]" )
+{
+    using namespace iceSYCL;
+    using Cubic2d = CubicInterpolationScheme<Double2DCoordinateConfiguration>;
+    using Coordinate_t = Cubic2d::Coordinate_t;
+    using scalar_t = Cubic2d::scalar_t;
+
+    Coordinate_t zero = MakeCoordinate<Cubic2d::CoordinateConfiguration>({0.0, 0.0});
+    std::vector<Coordinate_t> particle_positions = {
+        MakeCoordinate<Cubic2d::CoordinateConfiguration>({0.0, 0.0}),
+        MakeCoordinate<Cubic2d::CoordinateConfiguration>({100.0, 100.0}),
+        MakeCoordinate<Cubic2d::CoordinateConfiguration>({100.0, 100.0}),
+        MakeCoordinate<Cubic2d::CoordinateConfiguration>({10.5, 10.5}),
+        MakeCoordinate<Cubic2d::CoordinateConfiguration>({110.5, 110.5}),
+        MakeCoordinate<Cubic2d::CoordinateConfiguration>({110.5, 110.5})
+    };
+    size_t particle_count = particle_positions.size();
+    std::vector<scalar_t> particle_mass(particle_count, 1.0);
+    std::vector<Coordinate_t>  particle_velocities(particle_count, zero);
+
+    const scalar_t h{1.0};
+    Cubic2d interpolator(h);
+    ParticleGridInteractionManager<Cubic2d> pgi_manager(particle_count);
+
+    auto initial_state = Engine<Cubic2d>::MakeInitialState(
+        particle_positions,
+        particle_velocities,
+        particle_mass,
+        pgi_manager,
+        interpolator
+        );
+
+
+    auto rest_volumes = initial_state.rest_volumes;
+
+    //for(auto v_p : rest_volumes)
+    //    std::cout << v_p << ", " ;
+    //std::cout << std::endl;
+
+    CHECK(rest_volumes[1] == Approx(rest_volumes[2]));
+    CHECK(rest_volumes[1] == Approx(0.5 * rest_volumes[0]));
+    CHECK(rest_volumes[4] == Approx(rest_volumes[5]));
+    CHECK(rest_volumes[4] == Approx(0.5 * rest_volumes[3]));
+}

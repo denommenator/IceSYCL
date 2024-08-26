@@ -9,6 +9,7 @@
 #include "coordinates.hpp"
 #include "interpolation.hpp"
 #include "particle_grid_interactions.hpp"
+#include "particle_grid_operations.hpp"
 
 
 namespace iceSYCL
@@ -42,12 +43,64 @@ public:
     static ParticleInitialState MakeInitialState(
         std::vector<Coordinate_t> positions,
         std::vector<Coordinate_t> velocities,
-        std::vector<Coordinate_t> masses,
-        ParticleNodeInteraction<CoordinateConfiguration>& interaction_manager
+        std::vector<scalar_t> masses,
+        ParticleGridInteractionManager<InterpolationScheme>& interaction_manager,
+        InterpolationScheme interpolator
         )
     {
-        //TODO implement the formula that actually calculates particle rest volumes using grid interpolation
-        std::vector<scalar_t> particle_rest_volumes(positions.size(), 1.0);
+
+        size_t particle_count = positions.size();
+        std::vector<scalar_t> particle_rest_volumes(particle_count, 0.0);
+        std::vector<scalar_t> node_masses(particle_count * InterpolationScheme::num_interactions_per_particle, 0.0);
+
+        //Determine rest volumes of the particles
+        {
+            sycl::buffer node_massesB(node_masses);
+            sycl::buffer particle_rest_volumesB(particle_rest_volumes);
+            sycl::buffer particle_massesB(masses);
+            sycl::buffer particle_positionsB(positions);
+
+            sycl::queue q;
+
+            auto& pgi_manager = interaction_manager;
+
+            pgi_manager.update_particle_locations(q, particle_positionsB, interpolator);
+            transfer_data_particles_to_grid(q, pgi_manager, interpolator, particle_massesB, node_massesB, particle_positionsB, 0.0);
+
+            auto interaction_access = pgi_manager.kernel_accessor;
+            q.submit([&](sycl::handler& h)
+            {
+                sycl::accessor particle_mass_acc(particle_massesB, h);
+                sycl::accessor node_mass_acc(node_massesB, h);
+                sycl::accessor particle_position_acc(particle_positionsB, h);
+                sycl::accessor particle_rest_volumes_acc(particle_rest_volumesB, h);
+                interaction_access.give_kernel_access(h);
+
+                h.parallel_for(particle_count, [=](sycl::id<1> idx)
+                {
+                    size_t pid = idx[0];
+
+                    scalar_t mass_p = particle_mass_acc[pid];
+                    Coordinate_t x_p = particle_position_acc[pid];
+                    scalar_t denominator = 0.0;
+                    for(auto interaction_it = interaction_access.particle_interactions_begin(pid);
+                        interaction_it != interaction_access.particle_interactions_end(pid);
+                        ++interaction_it)
+                    {
+                        ParticleNodeInteraction<typename TInterpolationScheme::CoordinateConfiguration> interaction = *interaction_it;
+                        size_t node_id = interaction.node_id;
+                        scalar_t mass_i = node_mass_acc[node_id];
+
+                        denominator += mass_i * interpolator.value(interaction.node_index, x_p);
+                    }
+                    particle_rest_volumes_acc[pid] = mass_p * interpolator.node_volume() / denominator;
+                });
+
+            });
+            q.wait();
+        }
+
+
         return {
             positions,
             velocities,
@@ -77,7 +130,8 @@ public:
     public:
         static ParticleData InitialStateFactory(ParticleInitialState& initial_state)
         {
-            ParticleData ret(initial_state.positions.size());
+            size_t particle_count = initial_state.positions.size();
+            ParticleData ret(particle_count);
             iceSYCL::host_copy_all(initial_state.positions, ret.positions);
             iceSYCL::host_copy_all(initial_state.positions, ret.positions_prev);
             iceSYCL::host_copy_all(initial_state.velocities, ret.velocities);
