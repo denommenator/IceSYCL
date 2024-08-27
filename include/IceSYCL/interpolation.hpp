@@ -5,21 +5,13 @@
 #ifndef INTERPOLATION_HPP
 #define INTERPOLATION_HPP
 
+#include <cmath>
+
 #include "coordinates.hpp"
+#include "utility.hpp"
 
 namespace iceSYCL
 {
-
-static constexpr int compile_time_power(const int base, const int exponent)
-{
-    int ret = 1;
-    for(int i = 0; i < exponent; i++)
-    {
-        ret *= base;
-    }
-    return ret;
-}
-
 
 template<class TCoordinateConfiguration>
 class CubicInterpolationScheme
@@ -42,7 +34,7 @@ public:
     static constexpr int Dimension = CoordinateConfiguration::Dimension;
 
     static constexpr int _num_interactions_per_dimension = 4;
-    static constexpr int num_interactions_per_particle = compile_time_power(_num_interactions_per_dimension, CoordinateConfiguration::Dimension);
+    static constexpr int num_interactions_per_particle = pow<CoordinateConfiguration::Dimension, int>(_num_interactions_per_dimension);
 
     scalar_t h;
 
@@ -131,7 +123,7 @@ public:
 
     scalar_t node_volume() const
     {
-        return std::pow(h, Dimension);
+        return pow<Dimension>(h);
     }
 
 private:

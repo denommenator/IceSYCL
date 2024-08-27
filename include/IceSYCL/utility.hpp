@@ -23,6 +23,27 @@ void host_fill_all(sycl::buffer<TData_t> buffer, TData_t value)
     std::fill(buffer_acc.begin(), buffer_acc.end(), value);
 }
 
+template<int exp, class scalar_t> constexpr scalar_t pow(scalar_t base);
+
+template<>
+inline constexpr double pow<1, double>(double base){ return base; }
+template<>
+inline constexpr float pow<1, float>(float base){ return base; }
+template<>
+inline constexpr int pow<1, int>(int base){ return base; }
+template<>
+inline constexpr double pow<2, double>(double base){ return base * base; }
+template<>
+inline constexpr float pow<2, float>(float base){ return base * base; }
+template<>
+inline constexpr int pow<2, int>(int base){ return base * base; }
+template<>
+inline constexpr double pow<3, double>(double base){ return base * base * base; }
+template<>
+inline constexpr float pow<3, float>(float base){ return base * base * base; }
+template<>
+inline constexpr int pow<3, int>(int base){ return base * base * base; }
+
 }
 
 #endif //UTILITY_HPP

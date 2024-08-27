@@ -28,6 +28,7 @@ EXPORT_API Engine2D* create_2D_engine(
     const double h)
 {
     using namespace iceSYCL;
+    using namespace raw_buffer_utility;
     using CoordinateConfiguration = Engine2D::CoordinateConfiguration;
     using Coordinate_t = Engine2D::Coordinate_t;
     using scalar_t = Engine2D::scalar_t;

@@ -179,7 +179,7 @@ public:
     interpolator{interpolator_instance},
     pgi_manager{std::move(interaction_manager_instance)},
     particle_data{std::move(particle_data)},
-    node_data{}
+    node_data{particle_count * InterpolationScheme::num_interactions_per_particle}
     {}
 
     static Engine FromInitialState(
@@ -188,10 +188,10 @@ public:
         std::vector<Coordinate_t> velocities,
         std::vector<scalar_t> masses)
     {
-        ParticleNodeInteraction<CoordinateConfiguration> interaction_manager(positions.size());
-        ParticleInitialState initial_state = MakeInitialState(positions, velocities, masses, interaction_manager);
+        ParticleGridInteractionManager<InterpolationScheme> pgi_manager(positions.size());
+        ParticleInitialState initial_state = MakeInitialState(positions, velocities, masses, pgi_manager, interpolator);
 
-        return Engine(interpolator, interaction_manager, ParticleData::InitialStateFactory(initial_state));
+        return Engine(interpolator, std::move(pgi_manager), std::move(ParticleData::InitialStateFactory(initial_state)));
     }
 public:
     struct NodeData
