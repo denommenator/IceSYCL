@@ -186,7 +186,7 @@ public:
         InterpolationScheme interpolator,
         std::vector<Coordinate_t> positions,
         std::vector<Coordinate_t> velocities,
-        std::vector<Coordinate_t> masses)
+        std::vector<scalar_t> masses)
     {
         ParticleNodeInteraction<CoordinateConfiguration> interaction_manager(positions.size());
         ParticleInitialState initial_state = MakeInitialState(positions, velocities, masses, interaction_manager);
