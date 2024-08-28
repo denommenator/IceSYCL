@@ -86,7 +86,7 @@ public:
         return ret;
     }
 
-    Coordinate_t gradient_impl(NodeIndex_t i, Coordinate_t x_p) const
+    Coordinate_t gradient(NodeIndex_t i, Coordinate_t x_p) const
     {
         Coordinate_t x_i = position(i);
         Coordinate_t ret;

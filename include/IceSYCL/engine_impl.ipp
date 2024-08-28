@@ -9,15 +9,17 @@ namespace iceSYCL
 {
 
 template<class TInterpolationScheme>
-void Engine<TInterpolationScheme>::step_frame(sycl::queue& q)
+void Engine<TInterpolationScheme>::step_frame()
 {
+    sycl::queue q{};
+    auto q_policy = dpl::execution::make_device_policy(q);
     const size_t num_steps_per_frame = 50;
     const scalar_t dt = 1.0 / (50 * num_steps_per_frame);
 
     for(size_t step = 0; step < num_steps_per_frame; ++step)
     {
-        dpl::copy(q, dpl::begin(particle_data.positions), dpl::end(particle_data.positions), dpl::begin(particle_data.positions_prev));
-        dpl::copy(q, dpl::begin(particle_data.velocities), dpl::end(particle_data.velocities), dpl::begin(particle_data.velocities_prev));
+        dpl::copy(q_policy, dpl::begin(particle_data.positions), dpl::end(particle_data.positions), dpl::begin(particle_data.positions_prev));
+        dpl::copy(q_policy, dpl::begin(particle_data.velocities), dpl::end(particle_data.velocities), dpl::begin(particle_data.velocities_prev));
 
         pgi_manager.update_particle_locations(q, particle_data.positions, interpolator);
 
@@ -27,9 +29,9 @@ void Engine<TInterpolationScheme>::step_frame(sycl::queue& q)
         compute_node_velocities(q);
         transfer_velocity_nodes_to_particles_APIC(q);
 
-        dpl::copy(dpl::begin(particle_data.deformation_gradients), dpl::end(particle_data.deformation_gradients), dpl::begin(particle_data.deformation_gradients_prev));
+        dpl::copy(q_policy, dpl::begin(particle_data.deformation_gradients), dpl::end(particle_data.deformation_gradients), dpl::begin(particle_data.deformation_gradients_prev));
 
-        update_particle_deformation_gradients(q);
+        update_particle_deformation_gradients(q, dt);
 
         q.submit([&](sycl::handler& h)
         {
@@ -43,14 +45,14 @@ void Engine<TInterpolationScheme>::step_frame(sycl::queue& q)
             });
         });
     }
+    q.wait();
 }
 
 template<class TInterpolationScheme>
 void Engine<TInterpolationScheme>::apply_particle_forces_to_grid(sycl::queue& q, scalar_t dt)
 {
     auto interaction_access = pgi_manager.kernel_accessor;
-
-    Coordinate_t gravity = Coordinate_t(0.0, -981.0);
+    auto n = interpolator;
     //nodes
     q.submit([&](sycl::handler& h)
     {
@@ -79,7 +81,8 @@ void Engine<TInterpolationScheme>::apply_particle_forces_to_grid(sycl::queue& q,
 
                 NodeIndex_t node_index = interaction.node_index;
 
-                force_i += interpolator.value(node_index, x_p) * mass_p * gravity;
+                Coordinate_t gravity = Coordinate_t(0.0, -981.0);
+                force_i += n.value(node_index, x_p) * mass_p * gravity;
             }
 
             node_momenta_acc[node_id] += dt * force_i;
@@ -105,6 +108,7 @@ void Engine<TInterpolationScheme>::transfer_momentum_particles_to_nodes_APIC(syc
 
     auto interaction_access = pgi_manager.kernel_accessor;
 
+    auto n = interpolator;
     //particles
     q.submit([&](sycl::handler& h)
     {
@@ -128,9 +132,9 @@ void Engine<TInterpolationScheme>::transfer_momentum_particles_to_nodes_APIC(syc
 
 
                 NodeIndex_t node_index = interaction.node_index;
-                scalar_t n_value = interpolator.value(node_index, x_p);
+                scalar_t n_value = n.value(node_index, x_p);
 
-                D_p += n_value * (interpolator.position(node_index) - x_p) * (interpolator.position(node_index) - x_p).transpose();
+                D_p += n_value * (n.position(node_index) - x_p) * (n.position(node_index) - x_p).transpose();
             }
 
             particle_D_matrices_acc[pid] = D_p;
@@ -171,7 +175,7 @@ void Engine<TInterpolationScheme>::transfer_momentum_particles_to_nodes_APIC(syc
 
                 NodeIndex_t node_index = interaction.node_index;
 
-                momentum_i += interpolator.value(node_index, x_p) * mass_p * (v_p + B_p * D_p.inverse() * (interpolator.position(node_index) - x_p));
+                momentum_i += n.value(node_index, x_p) * mass_p * (v_p + B_p * inverse(D_p) * (n.position(node_index) - x_p));
             }
 
             node_momenta_acc[node_id] = momentum_i;
@@ -215,6 +219,7 @@ void Engine<TInterpolationScheme>::compute_node_velocities(sycl::queue& q)
 template<class TInterpolationScheme>
 void Engine<TInterpolationScheme>::transfer_velocity_nodes_to_particles(sycl::queue& q)
 {
+    auto n = interpolator;
     auto interaction_access = pgi_manager.kernel_accessor;
     q.submit([&](sycl::handler& h)
     {
@@ -239,7 +244,7 @@ void Engine<TInterpolationScheme>::transfer_velocity_nodes_to_particles(sycl::qu
                 Coordinate_t v_i = node_velocity_acc[node_id];
                 NodeIndex_t node_index = interaction.node_index;
 
-                v_p += interpolator.value(node_index, x_p) * v_i;
+                v_p += n.value(node_index, x_p) * v_i;
             }
 
             particle_velocity_acc[pid] = v_p;
@@ -253,6 +258,7 @@ void Engine<TInterpolationScheme>::transfer_velocity_nodes_to_particles_APIC(syc
 {
     transfer_velocity_nodes_to_particles(q);
 
+    auto n = interpolator;
     auto interaction_access = pgi_manager.kernel_accessor;
     q.submit([&](sycl::handler& h)
     {
@@ -276,9 +282,9 @@ void Engine<TInterpolationScheme>::transfer_velocity_nodes_to_particles_APIC(syc
                 size_t node_id = interaction.node_id;
                 Coordinate_t v_i = node_velocity_acc[node_id];
                 NodeIndex_t node_index = interaction.node_index;
-                Coordinate_t x_i = interpolator.position(node_index);
+                Coordinate_t x_i = n.position(node_index);
 
-                B_p += interpolator.value(node_index, x_p) * v_i * (x_i - x_p).transpose();
+                B_p += n.value(node_index, x_p) * v_i * (x_i - x_p).transpose();
             }
 
             particle_B_matrices_acc[pid] = B_p;
@@ -290,6 +296,7 @@ void Engine<TInterpolationScheme>::transfer_velocity_nodes_to_particles_APIC(syc
 template<class TInterpolationScheme>
 void Engine<TInterpolationScheme>::update_particle_deformation_gradients(sycl::queue& q, Engine<TInterpolationScheme>::scalar_t dt)
 {
+    auto n = interpolator;
     auto interaction_access = pgi_manager.kernel_accessor;
     q.submit([&](sycl::handler& h)
     {
@@ -313,9 +320,9 @@ void Engine<TInterpolationScheme>::update_particle_deformation_gradients(sycl::q
                 size_t node_id = interaction.node_id;
                 Coordinate_t v_i = node_velocity_acc[node_id];
                 NodeIndex_t node_index = interaction.node_index;
-                Coordinate_t x_i = interpolator.position(node_index);
+                Coordinate_t x_i = n.position(node_index);
 
-                Coordinate_t grad_n_i = interpolator.gradient(node_index, x_p);
+                Coordinate_t grad_n_i = n.gradient(node_index, x_p);
 
                 del_v_del_x_p += dt * v_i * grad_n_i.transpose();
             }

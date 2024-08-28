@@ -14,20 +14,23 @@
 //using MakeCoordinate2D = iceSYCL::MakeCoordinate<Configuration2D>;
 namespace raw_buffer_utility
 {
-template<class CoordinateConfiguration>
-void copy(const typename CoordinateConfiguration::scalar_t *data_raw, std::vector<typename CoordinateConfiguration::Coordinate_t>& coordinates_vec)
+template<class CoordinateConfiguration, class CoordinateContainer_t>
+void copy(const typename CoordinateConfiguration::scalar_t *data_raw, CoordinateContainer_t& coordinates_vec)
 {
     using Coordinate_t = typename CoordinateConfiguration::Coordinate_t;
     size_t count = coordinates_vec.size();
 
-    for(size_t i = 0; i < count; ++i)
+    size_t i = 0;
+    for(auto it = coordinates_vec.begin(); it != coordinates_vec.end(); ++it)
     {
+
         Coordinate_t coord_i = Coordinate_t::Zero();
         for(int dim = 0; dim < CoordinateConfiguration::Dimension; ++dim)
         {
             coord_i(dim) = data_raw[CoordinateConfiguration::Dimension * i + dim];
         }
-        coordinates_vec[i] = coord_i;
+        *it = coord_i;
+        ++i;
     }
 }
 
@@ -40,19 +43,21 @@ std::vector<typename CoordinateConfiguration::Coordinate_t> to_coordinate_vector
     return res;
 }
 
-template<class CoordinateConfiguration>
-void copy(const std::vector<typename CoordinateConfiguration::Coordinate_t>& coordinates_vec, typename CoordinateConfiguration::scalar_t* data_raw)
+template<class CoordinateConfiguration, class CoordinateContainer_t>
+void copy(const CoordinateContainer_t& coordinates_vec, typename CoordinateConfiguration::scalar_t* data_raw)
 {
     using Coordinate_t = typename CoordinateConfiguration::Coordinate_t;
     size_t count = coordinates_vec.size();
 
-    for(size_t i = 0; i < count; ++i)
+    size_t i = 0;
+    for(auto it = coordinates_vec.begin(); it != coordinates_vec.end(); ++it)
     {
         Coordinate_t coord_i = Coordinate_t::Zero();
         for(int dim = 0; dim < CoordinateConfiguration::Dimension; ++dim)
         {
-            data_raw[CoordinateConfiguration::Dimension * i + dim] = coordinates_vec[i](dim);
+            data_raw[CoordinateConfiguration::Dimension * i + dim] = (*it)(dim);
         }
+        ++i;
     }
 }
 
@@ -64,5 +69,6 @@ std::vector<typename CoordinateConfiguration::scalar_t> to_scalar_vector(size_t 
     std::copy(data_raw, data_raw + count, res.begin());
     return res;
 }
+
 }
 #endif //BUFFER_HELPERS_HPP

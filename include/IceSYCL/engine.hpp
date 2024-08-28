@@ -7,6 +7,7 @@
 
 
 #include <oneapi/dpl/algorithm>
+#include <oneapi/dpl/execution>
 #include <oneapi/dpl/iterator>
 
 #include <sycl/sycl.hpp>
@@ -211,7 +212,7 @@ public:
     NodeData node_data;
 
 public:
-    void step_frame(sycl::queue& q);
+    void step_frame();
     void transer_mass_particles_to_nodes(sycl::queue& q);
     void transfer_momentum_particles_to_nodes_APIC(sycl::queue& q);
     void apply_particle_forces_to_grid(sycl::queue& q, scalar_t dt);

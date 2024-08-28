@@ -11,19 +11,21 @@
 //#include <iostream>
 
 #define EXPORT_API extern "C"
-
-struct ParticleState
-{
-    double* positions;
-    double* velocities;
-    size_t particle_count;
-
-};
+//
+// struct ParticleState
+// {
+//     double* positions;
+//     double* velocities;
+//     size_t particle_count;
+//
+// };
 
 using Engine2D = iceSYCL::Engine<iceSYCL::CubicInterpolationScheme<iceSYCL::Double2DCoordinateConfiguration>>;
 
-EXPORT_API Engine2D* create_2D_engine(
-    const ParticleState* initial_state,
+EXPORT_API Engine2D* create_engine(
+    size_t particle_count,
+    const double* positions,
+    const double* velocities,
     const double* masses,
     const double h)
 {
@@ -33,10 +35,8 @@ EXPORT_API Engine2D* create_2D_engine(
     using Coordinate_t = Engine2D::Coordinate_t;
     using scalar_t = Engine2D::scalar_t;
 
-    const size_t particle_count = initial_state->particle_count;
-
-    const std::vector<Coordinate_t> positions_vec = to_coordinate_vector<CoordinateConfiguration>(particle_count, initial_state->positions);
-    const std::vector<Coordinate_t> velocities_vec = to_coordinate_vector<CoordinateConfiguration>(particle_count, initial_state->velocities);
+    const std::vector<Coordinate_t> positions_vec = to_coordinate_vector<CoordinateConfiguration>(particle_count, positions);
+    const std::vector<Coordinate_t> velocities_vec = to_coordinate_vector<CoordinateConfiguration>(particle_count, velocities);
     const std::vector<scalar_t> masses_vec = to_scalar_vector<CoordinateConfiguration>(particle_count, masses);
 
     Engine2D engine = Engine2D::FromInitialState(
@@ -49,26 +49,18 @@ EXPORT_API Engine2D* create_2D_engine(
     return new Engine2D(engine);
 }
 
-// EXPORT_API void copy_current_state(Abominable::Engine* engine, double* current_state_raw_ptr)
-// {
-//     size_t particle_count = engine->get_current_particles().positions_.index_count();
-//     for(size_t pid = 0; pid < particle_count; pid++)
-//     {
-//         Abominable::Coordinate p = engine->get_current_particles().positions_.coordinate(pid);
-//         Abominable::Coordinate v = engine->get_current_particles().velocities_.coordinate(pid);
-//
-//         current_state_raw_ptr[Abominable::Dimension * pid + 0] = p(0);
-//         current_state_raw_ptr[Abominable::Dimension * pid + 1] = p(1);
-//
-//         //std::cout << p(0) << " " << p(1) << std::endl;
-//
-//         current_state_raw_ptr[Abominable::Dimension * particle_count + Abominable::Dimension * pid + 0] = v(0);
-//         current_state_raw_ptr[Abominable::Dimension * particle_count + Abominable::Dimension * pid + 1] = v(1);
-//     }
-//
-//     //current_state_raw_ptr[0] = particle_count;
-// }
-//
+EXPORT_API void copy_current_positions(Engine2D* engine, double* positions_raw_pointer)
+{
+    using Coordinate_t = Engine2D::Coordinate_t;
+    size_t particle_count = engine->particle_count;
+    {
+        sycl::host_accessor positions_acc(engine->particle_data.positions);
+        raw_buffer_utility::copy<iceSYCL::Double2DCoordinateConfiguration, sycl::host_accessor<Coordinate_t>>(positions_acc, positions_raw_pointer);
+    }
+
+    //current_state_raw_ptr[0] = particle_count;
+}
+
 // EXPORT_API void copy_deformation_gradients(Abominable::Engine* engine, double* deformation_gradients_raw_ptr)
 // {
 //     Abominable::ParticleMatrix& particle_deformation_gradients = engine->get_particle_deformation_gradients();
@@ -98,11 +90,11 @@ EXPORT_API Engine2D* create_2D_engine(
 //
 //     //current_state_raw_ptr[0] = particle_count;
 //  }
-//
-// EXPORT_API void step_frame(Abominable::Engine* engine)
-// {
-//     engine->step_frame();
-// }
+
+EXPORT_API void step_frame(Engine2D* engine)
+{
+    engine->step_frame();
+}
 
 
 EXPORT_API void delete_engine(Engine2D* engine)
