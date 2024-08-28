@@ -60,3 +60,31 @@ TEST_CASE( "Rest volume test", "[particle_node_operations]" )
     CHECK(rest_volumes[4] == Approx(rest_volumes[5]));
     CHECK(rest_volumes[4] == Approx(0.5 * rest_volumes[3]));
 }
+
+TEST_CASE( "First engine test!", "[particle_node_operations]" )
+{
+    using namespace iceSYCL;
+    using Cubic2d = CubicInterpolationScheme<Double2DCoordinateConfiguration>;
+    using Coordinate_t = Cubic2d::Coordinate_t;
+    using scalar_t = Cubic2d::scalar_t;
+
+    Coordinate_t zero = Coordinate_t::Zero();
+    std::vector<Coordinate_t> particle_positions = {
+        Coordinate_t(0.0, 0.0),
+        Coordinate_t(100.0, 100.0),
+        Coordinate_t(100.0, 100.0),
+        Coordinate_t(10.5, 10.5),
+        Coordinate_t(110.5, 110.5),
+        Coordinate_t(110.5, 110.5)
+    };
+    size_t particle_count = particle_positions.size();
+    std::vector<scalar_t> particle_mass(particle_count, 1.0);
+    std::vector<Coordinate_t>  particle_velocities(particle_count, zero);
+
+    const scalar_t h{1.0};
+    Cubic2d interpolator(h);
+
+    Engine<Cubic2d> engine = Engine<Cubic2d>::FromInitialState(interpolator,particle_positions, particle_velocities, particle_mass);
+    for(int i = 0; i < 50 * 2; ++i)
+        engine.step_frame();
+}

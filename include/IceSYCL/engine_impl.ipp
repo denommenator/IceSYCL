@@ -35,8 +35,8 @@ void Engine<TInterpolationScheme>::step_frame()
 
         q.submit([&](sycl::handler& h)
         {
-            sycl::accessor positions_acc(particle_data.positions);
-            sycl::accessor velocities_acc(particle_data.velocities);
+            sycl::accessor positions_acc(particle_data.positions, h);
+            sycl::accessor velocities_acc(particle_data.velocities, h);
 
             h.parallel_for(particle_count, [=](sycl::id<1> idx)
             {
@@ -194,7 +194,7 @@ void Engine<TInterpolationScheme>::compute_node_velocities(sycl::queue& q)
         sycl::accessor node_mass_acc(node_data.masses, h);
         sycl::accessor node_velocity_acc(node_data.velocities, h);
         sycl::accessor node_momenta_acc(node_data.momenta, h);
-        sycl::accessor node_count_acc(pgi_manager.node_count);
+        sycl::accessor node_count_acc(pgi_manager.node_count, h);
 
         h.parallel_for(node_data.max_node_count,[=](sycl::id<1> idx)
         {
