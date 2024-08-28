@@ -5,7 +5,6 @@
 #ifndef INTERPOLATION_HPP
 #define INTERPOLATION_HPP
 
-#include <cmath>
 
 #include "coordinates.hpp"
 #include "utility.hpp"
@@ -177,15 +176,7 @@ private:
 
     NodeIndex_t calculate_first_node(const Coordinate_t p) const
     {
-        //TODO use new round function
-        NodeIndex_t ret;
-
-        for(int dim = 0; dim < Dimension; ++dim)
-        {
-            ret(dim) = static_cast <int>(std::floor(p(dim) / h)) - 1;
-        }
-
-        return ret;
+        return (1.0 / h * p).floor() - NodeIndex_t::Ones();
     }
 
 };
