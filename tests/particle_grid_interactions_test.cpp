@@ -412,15 +412,15 @@ TEST_CASE( "NodeIndex sorting test", "[particle_node_interactions]" )
     using CoordinateConfiguration = Double2DCoordinateConfiguration;
     using NodeIndex_t = CoordinateConfiguration::NodeIndex_t;
     std::vector<NodeIndex_t> nodes = {
-        MakeNodeIndex<CoordinateConfiguration>({1, 1}),
-        MakeNodeIndex<CoordinateConfiguration>({0, 1}),
-        MakeNodeIndex<CoordinateConfiguration>({0, 0}),
+        NodeIndex_t(1, 1),
+        NodeIndex_t(0, 1),
+        NodeIndex_t(0, 0),
     };
 
     std::vector<NodeIndex_t> nodes_desired = {
-        MakeNodeIndex<CoordinateConfiguration>({0, 0}),
-        MakeNodeIndex<CoordinateConfiguration>({0, 1}),
-        MakeNodeIndex<CoordinateConfiguration>({1, 1}),
+        NodeIndex_t(0, 0),
+        NodeIndex_t(0, 1),
+        NodeIndex_t(1, 1),
     };
 
     auto node_index_comparer = [](NodeIndex_t& a, NodeIndex_t& b)->bool
@@ -460,8 +460,8 @@ TEST_CASE( "Particle Node Interaction test", "[particle_node_interactions]" )
     {
         std::vector<Cubic2d::Coordinate_t> particles_16_nodes =
         {
-            MakeCoordinate<Cubic2d::CoordinateConfiguration>({0.0, 0.0}),
-            MakeCoordinate<Cubic2d::CoordinateConfiguration>({0.0, 0.0}),
+            Cubic2d::Coordinate_t::Zero(),
+            Cubic2d::Coordinate_t::Zero(),
         };
         sycl::buffer particles_B(particles_16_nodes);
 
@@ -474,8 +474,8 @@ TEST_CASE( "Particle Node Interaction test", "[particle_node_interactions]" )
     {
         std::vector<Cubic2d::Coordinate_t> particles_20_nodes =
         {
-            MakeCoordinate<Cubic2d::CoordinateConfiguration>({0.0, 0.0}),
-            MakeCoordinate<Cubic2d::CoordinateConfiguration>({1.0, 0.0}),
+            Cubic2d::Coordinate_t(0.0, 0.0),
+            Cubic2d::Coordinate_t(1.0, 0.0),
         };
         sycl::buffer particles_B(particles_20_nodes);
 
@@ -488,8 +488,8 @@ TEST_CASE( "Particle Node Interaction test", "[particle_node_interactions]" )
     {
         std::vector<Cubic2d::Coordinate_t> particles_23_nodes =
         {
-            MakeCoordinate<Cubic2d::CoordinateConfiguration>({0.0, 0.0}),
-            MakeCoordinate<Cubic2d::CoordinateConfiguration>({1.0, 1.0}),
+            Cubic2d::Coordinate_t(0.0, 0.0),
+            Cubic2d::Coordinate_t(1.0, 1.0),
         };
         sycl::buffer particles_B(particles_23_nodes);
 
@@ -502,8 +502,8 @@ TEST_CASE( "Particle Node Interaction test", "[particle_node_interactions]" )
     {
         std::vector<Cubic2d::Coordinate_t> particles_32_nodes =
         {
-            MakeCoordinate<Cubic2d::CoordinateConfiguration>({0.0, 0.0}),
-            MakeCoordinate<Cubic2d::CoordinateConfiguration>({5.0, 5.0}),
+            Cubic2d::Coordinate_t(0.0, 0.0),
+            Cubic2d::Coordinate_t(5.0, 5.0),
         };
         sycl::buffer particles_B(particles_32_nodes);
 
@@ -536,9 +536,9 @@ TEST_CASE( "Particle Node Interaction node interaction data test", "[particle_no
     {
         std::vector<Cubic2d::Coordinate_t> particles_16_nodes =
         {
-            MakeCoordinate<Cubic2d::CoordinateConfiguration>({0.0, 0.0}),
-            MakeCoordinate<Cubic2d::CoordinateConfiguration>({0.0, 0.0}),
-            MakeCoordinate<Cubic2d::CoordinateConfiguration>({0.0, 0.0}),
+            Cubic2d::Coordinate_t::Zero(),
+            Cubic2d::Coordinate_t::Zero(),
+            Cubic2d::Coordinate_t::Zero(),
         };
         sycl::buffer particles_B(particles_16_nodes);
 
@@ -616,9 +616,9 @@ TEST_CASE( "kernel data accessor test", "[particle_node_interactions]" )
         sycl::buffer successB(success);
         std::vector<Cubic2d::Coordinate_t> particles_16_nodes =
         {
-            MakeCoordinate<Cubic2d::CoordinateConfiguration>({0.0, 0.0}),
-            MakeCoordinate<Cubic2d::CoordinateConfiguration>({0.0, 0.0}),
-            MakeCoordinate<Cubic2d::CoordinateConfiguration>({0.0, 0.0}),
+            Cubic2d::Coordinate_t(0.0, 0.0),
+            Cubic2d::Coordinate_t(0.0, 0.0),
+            Cubic2d::Coordinate_t(0.0, 0.0),
         };
         sycl::buffer particles_B(particles_16_nodes);
 

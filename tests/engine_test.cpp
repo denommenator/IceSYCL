@@ -23,14 +23,14 @@ TEST_CASE( "Rest volume test", "[particle_node_operations]" )
     using Coordinate_t = Cubic2d::Coordinate_t;
     using scalar_t = Cubic2d::scalar_t;
 
-    Coordinate_t zero = MakeCoordinate<Cubic2d::CoordinateConfiguration>({0.0, 0.0});
+    Coordinate_t zero = Coordinate_t::Zero();
     std::vector<Coordinate_t> particle_positions = {
-        MakeCoordinate<Cubic2d::CoordinateConfiguration>({0.0, 0.0}),
-        MakeCoordinate<Cubic2d::CoordinateConfiguration>({100.0, 100.0}),
-        MakeCoordinate<Cubic2d::CoordinateConfiguration>({100.0, 100.0}),
-        MakeCoordinate<Cubic2d::CoordinateConfiguration>({10.5, 10.5}),
-        MakeCoordinate<Cubic2d::CoordinateConfiguration>({110.5, 110.5}),
-        MakeCoordinate<Cubic2d::CoordinateConfiguration>({110.5, 110.5})
+        Coordinate_t(0.0, 0.0),
+        Coordinate_t(100.0, 100.0),
+        Coordinate_t(100.0, 100.0),
+        Coordinate_t(10.5, 10.5),
+        Coordinate_t(110.5, 110.5),
+        Coordinate_t(110.5, 110.5)
     };
     size_t particle_count = particle_positions.size();
     std::vector<scalar_t> particle_mass(particle_count, 1.0);

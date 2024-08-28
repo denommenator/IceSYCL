@@ -50,7 +50,7 @@ void Engine<TInterpolationScheme>::apply_particle_forces_to_grid(sycl::queue& q,
 {
     auto interaction_access = pgi_manager.kernel_accessor;
 
-    Coordinate_t gravity = MakeCoordinate<Coordinate_t>({0.0, -981.0});
+    Coordinate_t gravity = Coordinate_t(0.0, -981.0);
     //nodes
     q.submit([&](sycl::handler& h)
     {

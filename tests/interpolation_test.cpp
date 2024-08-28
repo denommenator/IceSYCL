@@ -21,7 +21,7 @@ TEST_CASE( "Interaction Generator Test", "[Interpolation]" )
     Cubic2d interpolator(h);
     std::array<Cubic2d::Interaction, 16> interactions;
 
-    Double2DCoordinateConfiguration::Coordinate_t p = MakeCoordinate<Double2DCoordinateConfiguration>({1.0, 1.0});
+    Double2DCoordinateConfiguration::Coordinate_t p(1.0, 1.0);
 
     interpolator.generate_particle_node_interactions(p, interactions.begin());
 
@@ -59,8 +59,8 @@ TEST_CASE( "Interaction Generator Kernel Test", "[Interpolation]" )
     Cubic2d interpolator(h);
     std::array<ParticleNodeInteraction<Double2DCoordinateConfiguration>, 32> interactions;
 
-    Double2DCoordinateConfiguration::Coordinate_t p0 = MakeCoordinate<Double2DCoordinateConfiguration>({1.0, 1.0});
-    Double2DCoordinateConfiguration::Coordinate_t p1 = MakeCoordinate<Double2DCoordinateConfiguration>({1.0, 1.0});
+    Double2DCoordinateConfiguration::Coordinate_t p0(1.0, 1.0);
+    Double2DCoordinateConfiguration::Coordinate_t p1(1.0, 1.0);
     std::array<Double2DCoordinateConfiguration::Coordinate_t, 2> points = {p0, p1};
     sycl::buffer pointsB(points);
     {
@@ -146,7 +146,7 @@ TEST_CASE( "Interpolation test", "[Interpolation]" )
 
     std::array<Interactions, Cubic2d::num_interactions_per_particle> interactions;
 
-    auto p = MakeCoordinate<Cubic2d::CoordinateConfiguration>({2.5, 2.5});
+    Cubic2d::Coordinate_t p (2.5, 2.5);
     Cubic2d::scalar_t p_mass = 1.0;
 
     Cubic2d::scalar_t h = 1.0;

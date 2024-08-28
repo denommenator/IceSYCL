@@ -25,7 +25,7 @@ TEST_CASE( "one particle mass interpolation test", "[particle_node_operations]" 
     using Coordinate_t = Cubic2d::Coordinate_t;
     using scalar_t = Cubic2d::scalar_t;
 
-    std::vector<Coordinate_t> particle_positions = {MakeCoordinate<Cubic2d::CoordinateConfiguration>({0.0, 0.0})};
+    std::vector<Coordinate_t> particle_positions = {Coordinate_t::Zero()};
     size_t particle_count = particle_positions.size();
     scalar_t particle_initial_mass = 2.0;
     std::vector<scalar_t> particle_mass = {particle_initial_mass};
@@ -78,7 +78,7 @@ TEST_CASE( "one particle mass interpolation and back test", "[particle_node_oper
     using Coordinate_t = Cubic2d::Coordinate_t;
     using scalar_t = Cubic2d::scalar_t;
 
-    std::vector<Coordinate_t> particle_positions = {MakeCoordinate<Cubic2d::CoordinateConfiguration>({0.0, 0.0})};
+    std::vector<Coordinate_t> particle_positions = {Coordinate_t::Zero()};
     size_t particle_count = particle_positions.size();
     scalar_t particle_initial_mass = 2.0;
     std::vector<scalar_t> particle_mass = {particle_initial_mass};

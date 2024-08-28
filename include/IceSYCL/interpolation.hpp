@@ -177,6 +177,7 @@ private:
 
     NodeIndex_t calculate_first_node(const Coordinate_t p) const
     {
+        //TODO use new round function
         NodeIndex_t ret;
 
         for(int dim = 0; dim < Dimension; ++dim)

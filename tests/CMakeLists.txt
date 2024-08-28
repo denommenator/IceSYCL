@@ -14,7 +14,8 @@ set(TEST_LIST
 "sorting_test"
 "accessor_abstraction_test"
 "engine_test"
-"particle_grid_operations_test")
+"particle_grid_operations_test"
+"coordinates_test")
 
 foreach(testVAR IN LISTS TEST_LIST)
     add_executable("${testVAR}" "${testVAR}.cpp")
