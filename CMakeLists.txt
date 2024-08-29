@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.20...3.28)
 
+set(CMAKE_CXX_COMPILER "clang++")
 #For cuda backend. Alternate backends supported based on compiler being used
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsycl -fsycl-targets=nvptx64-nvidia-cuda -Xsycl-target-backend=nvptx64-nvidia-cuda --cuda-gpu-arch=sm_61")
 

@@ -175,7 +175,7 @@ void Engine<TInterpolationScheme>::transfer_momentum_particles_to_nodes_APIC(syc
 
                 NodeIndex_t node_index = interaction.node_index;
 
-                momentum_i += n.value(node_index, x_p) * mass_p * (v_p + B_p * inverse(D_p) * (n.position(node_index) - x_p));
+                momentum_i += n.value(node_index, x_p) * mass_p * (v_p + B_p * small_la::inverse(D_p) * (n.position(node_index) - x_p));
             }
 
             node_momenta_acc[node_id] = momentum_i;

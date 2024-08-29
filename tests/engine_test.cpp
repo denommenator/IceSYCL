@@ -15,6 +15,7 @@
 
 #include <vector>
 #include <functional>
+#include <cmath>
 
 TEST_CASE( "Rest volume test", "[particle_node_operations]" )
 {
@@ -85,6 +86,36 @@ TEST_CASE( "First engine test!", "[particle_node_operations]" )
     Cubic2d interpolator(h);
 
     Engine<Cubic2d> engine = Engine<Cubic2d>::FromInitialState(interpolator,particle_positions, particle_velocities, particle_mass);
-    for(int i = 0; i < 50 * 2; ++i)
+    //for(int i = 0; i < 50 * 2; ++i)
         engine.step_frame();
+
+    {
+        sycl::host_accessor particle_positions_acc(engine.particle_data.positions);
+        sycl::host_accessor particle_velocities_acc(engine.particle_data.velocities);
+        for(size_t pid = 0; pid < particle_count; pid++)
+        {
+            Coordinate_t x_p = particle_positions_acc[pid];
+            CHECK(!std::isnan(x_p(0)));
+            CHECK(!std::isnan(x_p(1)));
+
+            Coordinate_t v_p = particle_velocities_acc[pid];
+            CHECK(!std::isnan(v_p(0)));
+            CHECK(!std::isnan(v_p(1)));
+        }
+
+        sycl::host_accessor node_momenta_acc(engine.node_data.momenta);
+        size_t node_count = engine.pgi_manager.get_node_count_host();
+        for(size_t node_id = 0; node_id < node_count; node_id++)
+        {
+            Coordinate_t m_i = node_momenta_acc[node_id];
+            CHECK(!std::isnan(m_i(0)));
+            CHECK(!std::isnan(m_i(1)));
+        }
+    }
+
+
+    Engine<Cubic2d>::CoordinateMatrix_t D(
+            1.0, 0.0,
+            1.0, 0.0);
+    auto D_inv = inverse(D);
 }

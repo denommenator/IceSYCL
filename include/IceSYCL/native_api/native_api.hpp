@@ -7,6 +7,7 @@
 
 #include <IceSYCL/engine.hpp>
 #include "buffer_helpers.hpp"
+#include <small_la/small_matrix.hpp>
 
 //#include <iostream>
 

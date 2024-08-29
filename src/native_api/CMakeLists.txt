@@ -1,5 +1,4 @@
 
-
 # Make an automatic library - will be static or dynamic based on user setting
 add_library(IceSYCL_NativeAPI SHARED "${IceSYCL_SOURCE_DIR}/src/native_api/native_api.cpp" "${IceSYCL_SOURCE_DIR}/include/IceSYCL/native_api/native_api.hpp" )
 #add_library(Abominable_library Abominable.cpp ${HEADER_LIST})
