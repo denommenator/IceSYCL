@@ -25,7 +25,7 @@ void Engine<TInterpolationScheme>::step_frame()
 
         transer_mass_particles_to_nodes(q);
         transfer_momentum_particles_to_nodes_APIC(q);
-        apply_particle_forces_to_grid(q, dt);
+        apply_particle_forces_to_grid(q, collision_walls, dt);
         compute_node_velocities(q);
         transfer_velocity_nodes_to_particles_APIC(q);
 
@@ -49,7 +49,7 @@ void Engine<TInterpolationScheme>::step_frame()
 }
 
 template<class TInterpolationScheme>
-void Engine<TInterpolationScheme>::apply_particle_forces_to_grid(sycl::queue& q, scalar_t dt)
+void Engine<TInterpolationScheme>::apply_particle_forces_to_grid(sycl::queue& q, sycl::buffer<ElasticCollisionWall<CoordinateConfiguration>> walls, scalar_t dt)
 {
     auto interaction_access = pgi_manager.kernel_accessor;
     auto n = interpolator;
@@ -59,6 +59,7 @@ void Engine<TInterpolationScheme>::apply_particle_forces_to_grid(sycl::queue& q,
         sycl::accessor particle_mass_acc(particle_data.masses, h);
         sycl::accessor particle_positions_acc(particle_data.positions, h);
         sycl::accessor node_momenta_acc(node_data.momenta, h);
+        sycl::accessor walls_acc(walls, h);
 
         interaction_access.give_kernel_access(h);
 
@@ -80,6 +81,11 @@ void Engine<TInterpolationScheme>::apply_particle_forces_to_grid(sycl::queue& q,
                 Coordinate_t x_p = particle_positions_acc[pid];
 
                 NodeIndex_t node_index = interaction.node_index;
+
+                for(ElasticCollisionWall<CoordinateConfiguration>& wall : walls_acc)
+                {
+                    force_i -= wall.gradient(x_p);
+                }
 
                 Coordinate_t gravity = Coordinate_t(0.0, -981.0);
                 force_i += n.value(node_index, x_p) * mass_p * gravity;

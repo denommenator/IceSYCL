@@ -17,6 +17,7 @@
 #include "interpolation.hpp"
 #include "particle_grid_interactions.hpp"
 #include "particle_grid_operations.hpp"
+#include "collision.h"
 
 
 
@@ -175,24 +176,28 @@ public:
     ParticleData particle_data;
     const size_t particle_count;
 public:
-    Engine(InterpolationScheme interpolator_instance, ParticleGridInteractionManager<InterpolationScheme>&& interaction_manager_instance, ParticleData&& particle_data) :
+    Engine(InterpolationScheme interpolator_instance, ParticleGridInteractionManager<InterpolationScheme>&& interaction_manager_instance, ParticleData&& particle_data, sycl::buffer<ElasticCollisionWall<CoordinateConfiguration>>&& walls) :
     particle_count{particle_data.particle_count},
     interpolator{interpolator_instance},
     pgi_manager{std::move(interaction_manager_instance)},
     particle_data{std::move(particle_data)},
-    node_data{particle_count * InterpolationScheme::num_interactions_per_particle}
+    node_data{particle_count * InterpolationScheme::num_interactions_per_particle},
+    collision_walls{std::move(walls)}
     {}
 
     static Engine FromInitialState(
         InterpolationScheme interpolator,
         std::vector<Coordinate_t> positions,
         std::vector<Coordinate_t> velocities,
-        std::vector<scalar_t> masses)
+        std::vector<scalar_t> masses,
+        std::vector<ElasticCollisionWall<CoordinateConfiguration>> walls)
     {
         ParticleGridInteractionManager<InterpolationScheme> pgi_manager(positions.size());
         ParticleInitialState initial_state = MakeInitialState(positions, velocities, masses, pgi_manager, interpolator);
+        sycl::buffer<ElasticCollisionWall<CoordinateConfiguration>> walls_b(walls.size());
+        host_copy_all(walls, walls_b);
 
-        return Engine(interpolator, std::move(pgi_manager), std::move(ParticleData::InitialStateFactory(initial_state)));
+        return Engine(interpolator, std::move(pgi_manager), std::move(ParticleData::InitialStateFactory(initial_state)), std::move(walls_b));
     }
 public:
     struct NodeData
@@ -211,11 +216,13 @@ public:
 
     NodeData node_data;
 
+    sycl::buffer<ElasticCollisionWall<CoordinateConfiguration>> collision_walls;
+
 public:
     void step_frame();
     void transer_mass_particles_to_nodes(sycl::queue& q);
     void transfer_momentum_particles_to_nodes_APIC(sycl::queue& q);
-    void apply_particle_forces_to_grid(sycl::queue& q, scalar_t dt);
+    void apply_particle_forces_to_grid(sycl::queue& q, sycl::buffer<ElasticCollisionWall<CoordinateConfiguration>> walls, scalar_t dt);
     void apply_mpm_hyperelastic_forces_to_grid(sycl::queue& q);
     void compute_node_velocities(sycl::queue& q);
     void transfer_velocity_nodes_to_particles(sycl::queue& q);

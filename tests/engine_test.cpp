@@ -85,7 +85,8 @@ TEST_CASE( "First engine test!", "[particle_node_operations]" )
     const scalar_t h{1.0};
     Cubic2d interpolator(h);
 
-    Engine<Cubic2d> engine = Engine<Cubic2d>::FromInitialState(interpolator,particle_positions, particle_velocities, particle_mass);
+    std::vector<ElasticCollisionWall<Double2DCoordinateConfiguration>> walls{};
+    Engine<Cubic2d> engine = Engine<Cubic2d>::FromInitialState(interpolator,particle_positions, particle_velocities, particle_mass, walls);
     //for(int i = 0; i < 50 * 2; ++i)
         engine.step_frame();
 

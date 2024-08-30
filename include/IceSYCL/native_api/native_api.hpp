@@ -35,16 +35,25 @@ EXPORT_API Engine2D* create_engine(
     using CoordinateConfiguration = Engine2D::CoordinateConfiguration;
     using Coordinate_t = Engine2D::Coordinate_t;
     using scalar_t = Engine2D::scalar_t;
+    using Wall_t = ElasticCollisionWall<CoordinateConfiguration>;
 
     const std::vector<Coordinate_t> positions_vec = to_coordinate_vector<CoordinateConfiguration>(particle_count, positions);
     const std::vector<Coordinate_t> velocities_vec = to_coordinate_vector<CoordinateConfiguration>(particle_count, velocities);
     const std::vector<scalar_t> masses_vec = to_scalar_vector<CoordinateConfiguration>(particle_count, masses);
 
+    scalar_t wall_stiffness = 100.0;
+    std::vector<ElasticCollisionWall<CoordinateConfiguration>> walls = {
+            Wall_t{Coordinate_t(0.0, 1.0), Coordinate_t(0.0, -50.0), wall_stiffness},
+            Wall_t{Coordinate_t(1.0, 0.0), Coordinate_t(-100.0, 0.0), wall_stiffness},
+            Wall_t{Coordinate_t(-1.0, 0.0), Coordinate_t(100.0, 0.0), wall_stiffness}
+    };
+
     Engine2D engine = Engine2D::FromInitialState(
         Engine2D::InterpolationScheme(h),
         positions_vec,
         velocities_vec,
-        masses_vec
+        masses_vec,
+        walls
         );
 
     return new Engine2D(engine);

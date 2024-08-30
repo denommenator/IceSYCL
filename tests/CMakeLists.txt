@@ -18,7 +18,8 @@ set(TEST_LIST
 "coordinates_test")
 
 foreach(testVAR IN LISTS TEST_LIST)
-    add_executable("${testVAR}" "${testVAR}.cpp")
+    add_executable("${testVAR}" "${testVAR}.cpp"
+            ../include/IceSYCL/collision.h)
     target_compile_features("${testVAR}" PRIVATE cxx_std_17)
     target_link_libraries("${testVAR}" PRIVATE IceSYCL_library oneDPL Catch2::Catch2)
     add_test(NAME "${testVAR}" COMMAND "${testVAR}")
