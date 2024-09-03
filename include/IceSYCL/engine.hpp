@@ -49,24 +49,29 @@ public:
     ParticleGridInteractionManager<InterpolationScheme> pgi_manager;
 
 public:
-    static ParticleInitialState MakeInitialState(
+    static ParticleInitialState MakeUniformDensityInitialState(
         std::vector<Coordinate_t> positions,
         std::vector<Coordinate_t> velocities,
-        std::vector<scalar_t> masses,
         ParticleGridInteractionManager<InterpolationScheme>& interaction_manager,
-        InterpolationScheme interpolator
+        InterpolationScheme interpolator,
+        const scalar_t density
         )
     {
 
         size_t particle_count = positions.size();
         std::vector<scalar_t> particle_rest_volumes(particle_count, 0.0);
-        std::vector<scalar_t> node_masses(particle_count * InterpolationScheme::num_interactions_per_particle, 0.0);
+        std::vector<scalar_t> particle_masses(particle_count, 0.0);
+
+        //pre-dividing by node volume so the number density calc can use a standard particle-grid-operation
+        std::vector<scalar_t> ones_per_particle(particle_count, 1.0 / interpolator.node_volume());
+        std::vector<scalar_t> node_number_densities(particle_count * InterpolationScheme::num_interactions_per_particle, 0.0);
 
         //Determine rest volumes of the particles
         {
-            sycl::buffer node_massesB(node_masses);
+            sycl::buffer node_number_densitiesB(node_number_densities);
             sycl::buffer particle_rest_volumesB(particle_rest_volumes);
-            sycl::buffer particle_massesB(masses);
+            sycl::buffer particle_massesB(particle_masses);
+            sycl::buffer ones_per_particleB(ones_per_particle);
             sycl::buffer particle_positionsB(positions);
 
             sycl::queue q;
@@ -74,13 +79,13 @@ public:
             auto& pgi_manager = interaction_manager;
 
             pgi_manager.update_particle_locations(q, particle_positionsB, interpolator);
-            particle_grid_operations::transfer_data_particles_to_grid(q, pgi_manager, interpolator, particle_massesB, node_massesB, particle_positionsB, 0.0);
-
+            particle_grid_operations::transfer_data_particles_to_grid(q, pgi_manager, interpolator, ones_per_particleB, node_number_densitiesB, particle_positionsB, 0.0);
+            //node_number_densitiesB actually has number density times volume instead of just number density :-(
             auto interaction_access = pgi_manager.kernel_accessor;
             q.submit([&](sycl::handler& h)
             {
                 sycl::accessor particle_mass_acc(particle_massesB, h);
-                sycl::accessor node_mass_acc(node_massesB, h);
+                sycl::accessor node_number_densities_acc(node_number_densitiesB, h);
                 sycl::accessor particle_position_acc(particle_positionsB, h);
                 sycl::accessor particle_rest_volumes_acc(particle_rest_volumesB, h);
                 interaction_access.give_kernel_access(h);
@@ -89,20 +94,24 @@ public:
                 {
                     size_t pid = idx[0];
 
-                    scalar_t mass_p = particle_mass_acc[pid];
+                    scalar_t number_density_p = 0.0;
                     Coordinate_t x_p = particle_position_acc[pid];
-                    scalar_t denominator = 0.0;
                     for(auto interaction_it = interaction_access.particle_interactions_begin(pid);
                         interaction_it != interaction_access.particle_interactions_end(pid);
                         ++interaction_it)
                     {
                         ParticleNodeInteraction<typename TInterpolationScheme::CoordinateConfiguration> interaction = *interaction_it;
                         size_t node_id = interaction.node_id;
-                        scalar_t mass_i = node_mass_acc[node_id];
+                        scalar_t density_i = node_number_densities_acc[node_id];
 
-                        denominator += mass_i * interpolator.value(interaction.node_index, x_p);
+                        number_density_p += density_i * interpolator.value(interaction.node_index, x_p);
+
                     }
-                    particle_rest_volumes_acc[pid] = mass_p * interpolator.node_volume() / denominator;
+
+
+                    scalar_t volume_p = 1.0 / number_density_p;
+                    particle_rest_volumes_acc[pid] = volume_p;
+                    particle_mass_acc[pid] = volume_p * density;
                 });
 
             });
@@ -113,7 +122,7 @@ public:
         return {
             positions,
             velocities,
-            masses,
+            particle_masses,
             particle_rest_volumes
         };
     }
@@ -189,11 +198,12 @@ public:
         InterpolationScheme interpolator,
         std::vector<Coordinate_t> positions,
         std::vector<Coordinate_t> velocities,
-        std::vector<scalar_t> masses,
         std::vector<ElasticCollisionWall<CoordinateConfiguration>> walls)
     {
         ParticleGridInteractionManager<InterpolationScheme> pgi_manager(positions.size());
-        ParticleInitialState initial_state = MakeInitialState(positions, velocities, masses, pgi_manager, interpolator);
+        const scalar_t unit_density = 1.0;
+        ParticleInitialState initial_state = MakeUniformDensityInitialState(positions, velocities, pgi_manager,
+                                                                            interpolator, unit_density);
         sycl::buffer<ElasticCollisionWall<CoordinateConfiguration>> walls_b(walls.size());
         host_copy_all(walls, walls_b);
 

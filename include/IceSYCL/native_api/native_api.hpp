@@ -27,7 +27,6 @@ EXPORT_API Engine2D* create_engine(
     size_t particle_count,
     const double* positions,
     const double* velocities,
-    const double* masses,
     const double h)
 {
     using namespace iceSYCL;
@@ -39,7 +38,6 @@ EXPORT_API Engine2D* create_engine(
 
     const std::vector<Coordinate_t> positions_vec = to_coordinate_vector<CoordinateConfiguration>(particle_count, positions);
     const std::vector<Coordinate_t> velocities_vec = to_coordinate_vector<CoordinateConfiguration>(particle_count, velocities);
-    const std::vector<scalar_t> masses_vec = to_scalar_vector<CoordinateConfiguration>(particle_count, masses);
 
     scalar_t wall_stiffness = 100.0;
     std::vector<ElasticCollisionWall<CoordinateConfiguration>> walls = {
@@ -52,7 +50,6 @@ EXPORT_API Engine2D* create_engine(
         Engine2D::InterpolationScheme(h),
         positions_vec,
         velocities_vec,
-        masses_vec,
         walls
         );
 

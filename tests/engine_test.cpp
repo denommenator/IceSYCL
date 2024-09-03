@@ -41,13 +41,14 @@ TEST_CASE( "Rest volume test", "[particle_node_operations]" )
     Cubic2d interpolator(h);
     ParticleGridInteractionManager<Cubic2d> pgi_manager(particle_count);
 
-    auto initial_state = Engine<Cubic2d>::MakeInitialState(
-        particle_positions,
-        particle_velocities,
-        particle_mass,
-        pgi_manager,
-        interpolator
-        );
+    const scalar_t unit_density = 1.0;
+    auto initial_state = Engine<Cubic2d>::MakeUniformDensityInitialState(
+            particle_positions,
+            particle_velocities,
+            pgi_manager,
+            interpolator,
+            unit_density
+    );
 
 
     auto rest_volumes = initial_state.rest_volumes;
@@ -86,7 +87,7 @@ TEST_CASE( "First engine test!", "[particle_node_operations]" )
     Cubic2d interpolator(h);
 
     std::vector<ElasticCollisionWall<Double2DCoordinateConfiguration>> walls{};
-    Engine<Cubic2d> engine = Engine<Cubic2d>::FromInitialState(interpolator,particle_positions, particle_velocities, particle_mass, walls);
+    Engine<Cubic2d> engine = Engine<Cubic2d>::FromInitialState(interpolator,particle_positions, particle_velocities, walls);
     //for(int i = 0; i < 50 * 2; ++i)
         engine.step_frame();
 
