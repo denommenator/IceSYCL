@@ -72,14 +72,18 @@ class DensityBasedConstitutiveModel
         }
         else if constexpr (CoordinateConfiguration::Dimension == 3)
         {
-            scalar_t sigma_1 = Sigma(0,0);
-            scalar_t sigma_2 = Sigma(1,1);
-            scalar_t sigma_3 = Sigma(2,2);
+            scalar_t sigma_0 = Sigma(0,0);
+            scalar_t sigma_1 = Sigma(1,1);
+            scalar_t sigma_2 = Sigma(2,2);
 
-            D(0,0) = sigma_2 * sigma_3;
-            D(1,1) = sigma_1 * sigma_3;
-            D(2,2) = sigma_1 * sigma_2;
+            D(0,0) = sigma_1 * sigma_2;
+            D(1,1) = sigma_0 * sigma_2;
+            D(2,2) = sigma_0 * sigma_1;
 
+        }
+        else
+        {
+            static_assert((CoordinateConfiguration::Dimension == 2) || (CoordinateConfiguration::Dimension == 3), "Only dimensions 2 and 3 supported :-)");
         }
 
         CoordinateMatrix_t del_j_del_F = U * D * transpose(V);
