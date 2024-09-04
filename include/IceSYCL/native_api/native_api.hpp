@@ -28,7 +28,7 @@ EXPORT_API Engine2D* create_engine(
     size_t particle_count,
     const double* positions,
     const double* velocities,
-    const double h)
+    const double h, const double wall_stiffness)
 {
     using namespace iceSYCL;
     using namespace raw_buffer_utility;
@@ -40,7 +40,6 @@ EXPORT_API Engine2D* create_engine(
     const std::vector<Coordinate_t> positions_vec = to_coordinate_vector<CoordinateConfiguration>(particle_count, positions);
     const std::vector<Coordinate_t> velocities_vec = to_coordinate_vector<CoordinateConfiguration>(particle_count, velocities);
 
-    scalar_t wall_stiffness = 100.0;
     std::vector<ElasticCollisionWall<CoordinateConfiguration>> walls = {
             Wall_t{Coordinate_t(0.0, 1.0), Coordinate_t(0.0, -50.0), wall_stiffness},
             Wall_t{Coordinate_t(1.0, 0.0), Coordinate_t(-100.0, 0.0), wall_stiffness},
@@ -99,7 +98,7 @@ EXPORT_API void copy_current_positions(Engine2D* engine, double* positions_raw_p
 //     //current_state_raw_ptr[0] = particle_count;
 //  }
 
-EXPORT_API void step_frame(Engine2D* engine)
+EXPORT_API void step_frame(Engine2D* engine, double c_speed_of_sound, double mu_damping)
 {
     using namespace iceSYCL;
     using CoordinateConfiguration = Engine2D::CoordinateConfiguration;
@@ -107,9 +106,9 @@ EXPORT_API void step_frame(Engine2D* engine)
 //
 //    using Coordinate_t = Engine2D::Coordinate_t;
 //    using scalar_t = Engine2D::scalar_t;
-    ConstitutiveModel Psi{TaitPressureFromDensity<CoordinateConfiguration>{1.0, 3.0, 100}};
+    ConstitutiveModel Psi{TaitPressureFromDensity<CoordinateConfiguration>{1.0, 3.0, c_speed_of_sound}};
 
-    engine->step_frame(Psi);
+    engine->step_frame(Psi, mu_damping);
 }
 
 

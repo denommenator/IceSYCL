@@ -10,12 +10,15 @@ namespace iceSYCL
 
 template<class TInterpolationScheme>
 template<typename ConstitutiveModel>
-void Engine<TInterpolationScheme>::step_frame(const ConstitutiveModel Psi)
+void Engine<TInterpolationScheme>::step_frame(const ConstitutiveModel Psi, const double mu_velocity_damping)
 {
     sycl::queue q{};
     auto q_policy = dpl::execution::make_device_policy(q);
     const size_t num_steps_per_frame = 50;
     const scalar_t dt = 1.0 / (50 * num_steps_per_frame);
+    //dt = 1/N => mu_step^N = mu_step^(1/dt) = mu
+    //mu_step = mu^(dt)
+    const scalar_t mu_step = std::pow(mu_velocity_damping, dt);
 
     for(size_t step = 0; step < num_steps_per_frame; ++step)
     {
@@ -44,6 +47,7 @@ void Engine<TInterpolationScheme>::step_frame(const ConstitutiveModel Psi)
             {
                 size_t pid = idx[0];
                 positions_acc[pid] = positions_acc[pid] + dt * velocities_acc[pid];
+                velocities_acc[pid] *= mu_step;
             });
         });
     }
