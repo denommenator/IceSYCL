@@ -12,6 +12,7 @@
 #include <IceSYCL/interpolation.hpp>
 #include <IceSYCL/particle_grid_interactions.hpp>
 #include <IceSYCL/engine.hpp>
+#include <IceSYCL/constitutive_models.h>
 
 #include <vector>
 #include <functional>
@@ -66,9 +67,11 @@ TEST_CASE( "Rest volume test", "[particle_node_operations]" )
 TEST_CASE( "First engine test!", "[particle_node_operations]" )
 {
     using namespace iceSYCL;
-    using Cubic2d = CubicInterpolationScheme<Double2DCoordinateConfiguration>;
+    using CoordinateConfiguration = Double2DCoordinateConfiguration;
+    using Cubic2d = CubicInterpolationScheme<CoordinateConfiguration>;
     using Coordinate_t = Cubic2d::Coordinate_t;
     using scalar_t = Cubic2d::scalar_t;
+    using ConstitutiveModel = DensityBasedConstitutiveModel<TaitPressureFromDensity<CoordinateConfiguration>>;
 
     Coordinate_t zero = Coordinate_t::Zero();
     std::vector<Coordinate_t> particle_positions = {
@@ -88,8 +91,13 @@ TEST_CASE( "First engine test!", "[particle_node_operations]" )
 
     std::vector<ElasticCollisionWall<Double2DCoordinateConfiguration>> walls{};
     Engine<Cubic2d> engine = Engine<Cubic2d>::FromInitialState(interpolator,particle_positions, particle_velocities, walls);
+
+    ConstitutiveModel Psi{TaitPressureFromDensity<CoordinateConfiguration>{1.0, 3.0, 100}};
+//    Psi.pressure.unit_density = 1.0;
+//    Psi.pressure.gamma = 3.0;
+//    Psi.pressure.c = 100;
     //for(int i = 0; i < 50 * 2; ++i)
-        engine.step_frame();
+        engine.step_frame(Psi);
 
     {
         sycl::host_accessor particle_positions_acc(engine.particle_data.positions);

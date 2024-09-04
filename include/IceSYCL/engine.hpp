@@ -18,6 +18,7 @@
 #include "particle_grid_interactions.hpp"
 #include "particle_grid_operations.hpp"
 #include "collision.h"
+#include "constitutive_models.h"
 
 
 
@@ -229,11 +230,13 @@ public:
     sycl::buffer<ElasticCollisionWall<CoordinateConfiguration>> collision_walls;
 
 public:
-    void step_frame();
+    template<typename ConstitutiveModel>
+    void step_frame(const ConstitutiveModel Psi);
     void transer_mass_particles_to_nodes(sycl::queue& q);
     void transfer_momentum_particles_to_nodes_APIC(sycl::queue& q);
-    void apply_particle_forces_to_grid(sycl::queue& q, sycl::buffer<ElasticCollisionWall<CoordinateConfiguration>> walls, scalar_t dt);
-    void apply_mpm_hyperelastic_forces_to_grid(sycl::queue& q);
+    void apply_particle_forces_to_grid(sycl::queue& q, sycl::buffer<ElasticCollisionWall<CoordinateConfiguration>>& walls, scalar_t dt);
+    template<typename ConstitutiveModel>
+    void apply_mpm_hyperelastic_forces_to_grid(sycl::queue& q, const ConstitutiveModel Psi, const scalar_t dt);
     void compute_node_velocities(sycl::queue& q);
     void transfer_velocity_nodes_to_particles(sycl::queue& q);
     void transfer_velocity_nodes_to_particles_APIC(sycl::queue& q);

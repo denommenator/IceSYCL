@@ -9,7 +9,8 @@ namespace iceSYCL
 {
 
 template<class TInterpolationScheme>
-void Engine<TInterpolationScheme>::step_frame()
+template<typename ConstitutiveModel>
+void Engine<TInterpolationScheme>::step_frame(const ConstitutiveModel Psi)
 {
     sycl::queue q{};
     auto q_policy = dpl::execution::make_device_policy(q);
@@ -26,6 +27,7 @@ void Engine<TInterpolationScheme>::step_frame()
         transer_mass_particles_to_nodes(q);
         transfer_momentum_particles_to_nodes_APIC(q);
         apply_particle_forces_to_grid(q, collision_walls, dt);
+        apply_mpm_hyperelastic_forces_to_grid(q, Psi, dt);
         compute_node_velocities(q);
         transfer_velocity_nodes_to_particles_APIC(q);
 
@@ -49,7 +51,7 @@ void Engine<TInterpolationScheme>::step_frame()
 }
 
 template<class TInterpolationScheme>
-void Engine<TInterpolationScheme>::apply_particle_forces_to_grid(sycl::queue& q, sycl::buffer<ElasticCollisionWall<CoordinateConfiguration>> walls, scalar_t dt)
+void Engine<TInterpolationScheme>::apply_particle_forces_to_grid(sycl::queue& q, sycl::buffer<ElasticCollisionWall<CoordinateConfiguration>>& walls, scalar_t dt)
 {
     auto interaction_access = pgi_manager.kernel_accessor;
     auto n = interpolator;
@@ -84,7 +86,7 @@ void Engine<TInterpolationScheme>::apply_particle_forces_to_grid(sycl::queue& q,
 
                 for(ElasticCollisionWall<CoordinateConfiguration>& wall : walls_acc)
                 {
-                    force_i -= wall.gradient(x_p);
+                    force_i -= n.value(node_index, x_p) * wall.gradient(x_p);
                 }
 
                 Coordinate_t gravity = Coordinate_t(0.0, -981.0);
@@ -338,7 +340,53 @@ void Engine<TInterpolationScheme>::update_particle_deformation_gradients(sycl::q
 }
 
 
+template<typename TInterpolationScheme>
+template<typename ConstitutiveModel>
+void Engine<TInterpolationScheme>::apply_mpm_hyperelastic_forces_to_grid(sycl::queue& q, const ConstitutiveModel Psi, const scalar_t dt)
+{
+    auto interaction_access = pgi_manager.kernel_accessor;
+    auto n = interpolator;
+    //nodes
+    q.submit([&](sycl::handler& h)
+    {
+         sycl::accessor particle_mass_acc(particle_data.masses, h);
+         sycl::accessor particle_positions_acc(particle_data.positions, h);
+         sycl::accessor node_momenta_acc(node_data.momenta, h);
+         sycl::accessor deformation_gradient_acc(particle_data.deformation_gradients, h);
+         sycl::accessor rest_volume_acc(particle_data.rest_volumes, h);
 
+         interaction_access.give_kernel_access(h);
+
+         h.parallel_for(node_data.max_node_count,[=](sycl::id<1> idx)
+         {
+             const size_t node_count = interaction_access.node_count();
+             const size_t node_id = idx[0];
+             if(node_id >= node_count)
+                 return;
+
+             Coordinate_t force_i = Coordinate_t::Zero();
+             for(auto interaction_it = interaction_access.node_interactions_begin(node_id);
+                 interaction_it != interaction_access.node_interactions_end(node_id);
+                 ++interaction_it)
+             {
+                 ParticleNodeInteraction<typename TInterpolationScheme::CoordinateConfiguration> interaction = *interaction_it;
+                 size_t pid = interaction.particle_id;
+                 scalar_t mass_p = particle_mass_acc[pid];
+                 Coordinate_t x_p = particle_positions_acc[pid];
+                 scalar_t V_p = rest_volume_acc[pid];
+                 CoordinateMatrix_t F = deformation_gradient_acc[pid];
+                 CoordinateMatrix_t PK = Psi.PK(F);
+
+                 NodeIndex_t node_index = interaction.node_index;
+
+                 force_i -= dt * V_p * PK * F.transpose() * n.gradient(node_index, x_p);
+
+             }
+
+             node_momenta_acc[node_id] += dt * force_i;
+         });
+    });
+}
 }
 
 #endif //ENGINE_IMPL_HPP

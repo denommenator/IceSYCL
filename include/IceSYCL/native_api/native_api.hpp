@@ -6,6 +6,7 @@
 #define NATIVE_API_HPP
 
 #include <IceSYCL/engine.hpp>
+#include <IceSYCL/constitutive_models.h>
 #include "buffer_helpers.hpp"
 #include <small_la/small_matrix.hpp>
 
@@ -100,7 +101,15 @@ EXPORT_API void copy_current_positions(Engine2D* engine, double* positions_raw_p
 
 EXPORT_API void step_frame(Engine2D* engine)
 {
-    engine->step_frame();
+    using namespace iceSYCL;
+    using CoordinateConfiguration = Engine2D::CoordinateConfiguration;
+    using ConstitutiveModel = DensityBasedConstitutiveModel<TaitPressureFromDensity<CoordinateConfiguration>>;
+//
+//    using Coordinate_t = Engine2D::Coordinate_t;
+//    using scalar_t = Engine2D::scalar_t;
+    ConstitutiveModel Psi{TaitPressureFromDensity<CoordinateConfiguration>{1.0, 3.0, 100}};
+
+    engine->step_frame(Psi);
 }
 
 
