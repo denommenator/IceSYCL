@@ -10,7 +10,7 @@ namespace iceSYCL
 
 template<class TInterpolationScheme>
 template<typename ConstitutiveModel>
-void Engine<TInterpolationScheme>::step_frame_explicit(const ConstitutiveModel Psi, const size_t num_steps_per_frame, const double mu_velocity_damping)
+void Engine<TInterpolationScheme>::step_frame_explicit(const ConstitutiveModel Psi, const size_t num_steps_per_frame, const double mu_velocity_damping, const double gravity)
 {
     sycl::queue q{};
     auto q_policy = dpl::execution::make_device_policy(q);
@@ -28,7 +28,7 @@ void Engine<TInterpolationScheme>::step_frame_explicit(const ConstitutiveModel P
 
         transer_mass_particles_to_nodes(q);
         transfer_momentum_particles_to_nodes_APIC(q);
-        apply_particle_forces_to_grid(q, collision_walls, dt);
+        apply_particle_forces_to_grid(q, collision_walls, dt, gravity);
         apply_mpm_hyperelastic_forces_to_grid(q, Psi, dt);
         compute_node_velocities(q);
         transfer_velocity_nodes_to_particles_APIC(q);
@@ -54,7 +54,7 @@ void Engine<TInterpolationScheme>::step_frame_explicit(const ConstitutiveModel P
 }
 
 template<class TInterpolationScheme>
-void Engine<TInterpolationScheme>::apply_particle_forces_to_grid(sycl::queue& q, sycl::buffer<ElasticCollisionWall<CoordinateConfiguration>>& walls, scalar_t dt)
+void Engine<TInterpolationScheme>::apply_particle_forces_to_grid(sycl::queue& q, sycl::buffer<ElasticCollisionWall<CoordinateConfiguration>>& walls, scalar_t dt, const scalar_t gravity)
 {
     auto interaction_access = pgi_manager.kernel_accessor;
     auto n = interpolator;
@@ -92,8 +92,8 @@ void Engine<TInterpolationScheme>::apply_particle_forces_to_grid(sycl::queue& q,
                     force_i -= n.value(node_index, x_p) * wall.gradient(x_p);
                 }
 
-                Coordinate_t gravity = Coordinate_t(0.0, -0.0);//Coordinate_t(0.0, -981.0);
-                force_i += n.value(node_index, x_p) * mass_p * gravity;
+                Coordinate_t gravity_vec = Coordinate_t(0.0, -gravity);//Coordinate_t(0.0, -981.0);
+                force_i += n.value(node_index, x_p) * mass_p * gravity_vec;
             }
 
             node_momenta_acc[node_id] += dt * force_i;

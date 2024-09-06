@@ -255,13 +255,13 @@ public:
 
 public:
     template<typename ConstitutiveModel>
-    void step_frame(const ConstitutiveModel Psi, const size_t num_steps_per_frame = 50, const double mu_velocity_damping = 1.0)
-    {step_frame_explicit(Psi, num_steps_per_frame, mu_velocity_damping);}
+    void step_frame(const ConstitutiveModel Psi, const size_t num_steps_per_frame = 50, const double mu_velocity_damping = 1.0, const double gravity = 981.0)
+    {step_frame_explicit(Psi, num_steps_per_frame, mu_velocity_damping, gravity);}
     template<typename ConstitutiveModel>
-    void step_frame_explicit(const ConstitutiveModel Psi, const size_t num_steps_per_frame = 50, const double mu_velocity_damping = 1.0);
+    void step_frame_explicit(const ConstitutiveModel Psi, const size_t num_steps_per_frame = 50, const double mu_velocity_damping = 1.0, const double gravity = 981.0);
     void transer_mass_particles_to_nodes(sycl::queue& q);
     void transfer_momentum_particles_to_nodes_APIC(sycl::queue& q);
-    void apply_particle_forces_to_grid(sycl::queue& q, sycl::buffer<ElasticCollisionWall<CoordinateConfiguration>>& walls, scalar_t dt);
+    void apply_particle_forces_to_grid(sycl::queue& q, sycl::buffer<ElasticCollisionWall<CoordinateConfiguration>>& walls, scalar_t dt, const scalar_t gravity);
     template<typename ConstitutiveModel>
     void apply_mpm_hyperelastic_forces_to_grid(sycl::queue& q, const ConstitutiveModel Psi, const scalar_t dt);
     void compute_node_velocities(sycl::queue& q);
