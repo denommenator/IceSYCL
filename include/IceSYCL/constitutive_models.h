@@ -83,6 +83,7 @@ public:
         //density = mass / volume = rest_mass / (j * rest_volume) = unit_density / j
         const scalar_t density = pressure.unit_density / j;
 
+        /*
         CoordinateMatrix_t U,V;
         CoordinateMatrix_t Sigma;
         small_la::SVD(F, U, Sigma, V);
@@ -110,9 +111,41 @@ public:
         }
 
         CoordinateMatrix_t del_j_del_F = U * D * V.transpose();
+        */
+        CoordinateMatrix_t del_j_del_F = j * small_la::inverse(F).transpose();
+
         return pressure.value_prime(density) * (-pressure.unit_density / (j * j)) * del_j_del_F;
     }
 
 };
+
+template<class TCoordinateConfiguration>
+class FixedCorotated {
+public:
+    using CoordinateConfiguration = TCoordinateConfiguration;
+    using scalar_t = typename CoordinateConfiguration::scalar_t;
+    using Coordinate_t = typename CoordinateConfiguration::Coordinate_t;
+    using CoordinateMatrix_t = typename CoordinateConfiguration::CoordinateMatrix_t;
+
+    scalar_t lambda;
+    scalar_t mu;
+    /*
+    scalar_t value(CoordinateMatrix_t F) const
+    {
+
+    }
+    */
+
+    CoordinateMatrix_t PK(CoordinateMatrix_t F) const
+    {
+        CoordinateMatrix_t R, S;
+        small_la::PolarDecomposition(F, R, S);
+
+        scalar_t J = small_la::det(F);
+
+        return 2 * mu * (F - R) + lambda * (J - 1.0) * J * small_la::inverse(F).transpose();
+    }
+};
+
 }
 #endif //ICESYCL_CONSTITUTIVE_MODELS_H

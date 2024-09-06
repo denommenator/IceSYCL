@@ -92,7 +92,7 @@ void Engine<TInterpolationScheme>::apply_particle_forces_to_grid(sycl::queue& q,
                     force_i -= n.value(node_index, x_p) * wall.gradient(x_p);
                 }
 
-                Coordinate_t gravity = Coordinate_t(0.0, -981.0);
+                Coordinate_t gravity = Coordinate_t(0.0, -0.0);//Coordinate_t(0.0, -981.0);
                 force_i += n.value(node_index, x_p) * mass_p * gravity;
             }
 
@@ -351,7 +351,6 @@ void Engine<TInterpolationScheme>::update_particle_deformation_gradients(sycl::q
 
         h.parallel_for(particle_count,[=](sycl::id<1> idx) {
             size_t pid = idx[0];
-            Coordinate_t x_p = particle_positions_acc[pid];
 
             deformation_gradients_acc[pid] = del_v_del_x_acc[pid] * deformation_gradients_prev_acc[pid];
         });
@@ -373,7 +372,6 @@ void Engine<TInterpolationScheme>::apply_mpm_hyperelastic_forces_to_grid(sycl::q
     //nodes
     q.submit([&](sycl::handler& h)
     {
-         sycl::accessor particle_mass_acc(particle_data.masses, h);
          sycl::accessor particle_positions_acc(particle_data.positions, h);
          sycl::accessor node_momenta_acc(node_data.momenta, h);
          sycl::accessor deformation_gradient_acc(particle_data.deformation_gradients, h);
@@ -395,7 +393,6 @@ void Engine<TInterpolationScheme>::apply_mpm_hyperelastic_forces_to_grid(sycl::q
              {
                  ParticleNodeInteraction<typename TInterpolationScheme::CoordinateConfiguration> interaction = *interaction_it;
                  size_t pid = interaction.particle_id;
-                 scalar_t mass_p = particle_mass_acc[pid];
                  Coordinate_t x_p = particle_positions_acc[pid];
                  scalar_t V_p = rest_volume_acc[pid];
                  CoordinateMatrix_t F = deformation_gradient_acc[pid];

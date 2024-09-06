@@ -112,7 +112,7 @@ public:
 
     Coordinate_t position(NodeIndex_t i) const
     {
-        Coordinate_t i_scalar;
+        Coordinate_t i_scalar = Coordinate_t::Zero();
         for(int dim = 0; dim < Dimension; dim++)
         {
             i_scalar(dim) = i(dim);
