@@ -10,11 +10,10 @@ namespace iceSYCL
 
 template<class TInterpolationScheme>
 template<typename ConstitutiveModel>
-void Engine<TInterpolationScheme>::step_frame(const ConstitutiveModel Psi, const double mu_velocity_damping)
+void Engine<TInterpolationScheme>::step_frame_explicit(const ConstitutiveModel Psi, const size_t num_steps_per_frame, const double mu_velocity_damping)
 {
     sycl::queue q{};
     auto q_policy = dpl::execution::make_device_policy(q);
-    const size_t num_steps_per_frame = 50;
     const scalar_t dt = 1.0 / (50 * num_steps_per_frame);
     //dt = 1/N => mu_step^N = mu_step^(1/dt) = mu
     //mu_step = mu^(dt)
@@ -341,7 +340,28 @@ void Engine<TInterpolationScheme>::update_particle_deformation_gradients(sycl::q
             del_v_del_x_acc[pid] = del_v_del_x_p;
         });
     });
+
+    q.submit([&](sycl::handler& h)
+    {
+        sycl::accessor del_v_del_x_acc(particle_data.del_v_del_x, h);
+        sycl::accessor particle_positions_acc(particle_data.positions, h);
+        sycl::accessor deformation_gradients_acc(particle_data.deformation_gradients, h);
+        sycl::accessor deformation_gradients_prev_acc(particle_data.deformation_gradients_prev, h);
+
+
+        h.parallel_for(particle_count,[=](sycl::id<1> idx) {
+            size_t pid = idx[0];
+            Coordinate_t x_p = particle_positions_acc[pid];
+
+            deformation_gradients_acc[pid] = del_v_del_x_acc[pid] * deformation_gradients_prev_acc[pid];
+        });
+    });
+
+
 }
+
+
+
 
 
 template<typename TInterpolationScheme>
@@ -383,7 +403,7 @@ void Engine<TInterpolationScheme>::apply_mpm_hyperelastic_forces_to_grid(sycl::q
 
                  NodeIndex_t node_index = interaction.node_index;
 
-                 force_i -= dt * V_p * PK * F.transpose() * n.gradient(node_index, x_p);
+                 force_i -= V_p * PK * F.transpose() * n.gradient(node_index, x_p);
 
              }
 

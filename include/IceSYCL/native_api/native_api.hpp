@@ -98,17 +98,18 @@ EXPORT_API void copy_current_positions(Engine2D* engine, double* positions_raw_p
 //     //current_state_raw_ptr[0] = particle_count;
 //  }
 
-EXPORT_API void step_frame(Engine2D* engine, double c_speed_of_sound, double mu_damping)
+EXPORT_API void step_frame(Engine2D* engine, int num_steps_per_frame, double c_speed_of_sound, double mu_damping)
 {
     using namespace iceSYCL;
     using CoordinateConfiguration = Engine2D::CoordinateConfiguration;
-    using ConstitutiveModel = DensityBasedConstitutiveModel<TaitPressureFromDensity<CoordinateConfiguration>>;
+    //using ConstitutiveModel = DensityBasedConstitutiveModel<TaitPressureFromDensity<CoordinateConfiguration>>;
+    using ConstitutiveModel = DensityBasedConstitutiveModel<IdealGasFromDensity<CoordinateConfiguration>>;
 //
 //    using Coordinate_t = Engine2D::Coordinate_t;
 //    using scalar_t = Engine2D::scalar_t;
-    ConstitutiveModel Psi{TaitPressureFromDensity<CoordinateConfiguration>{1.0, 3.0, c_speed_of_sound}};
+    ConstitutiveModel Psi{IdealGasFromDensity<CoordinateConfiguration>{1.0, c_speed_of_sound}};
 
-    engine->step_frame(Psi, mu_damping);
+    engine->step_frame(Psi, num_steps_per_frame, mu_damping);
 }
 
 

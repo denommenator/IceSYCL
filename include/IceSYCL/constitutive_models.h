@@ -13,6 +13,27 @@
 namespace iceSYCL
 {
 
+
+template<class TCoordinateConfiguration>
+class IdealGasFromDensity
+{
+public:
+    using CoordinateConfiguration = TCoordinateConfiguration;
+    using scalar_t = typename CoordinateConfiguration::scalar_t;
+    scalar_t unit_density;
+    scalar_t k_stiffness;
+
+    scalar_t value(scalar_t density) const
+    {
+        return k_stiffness * density / unit_density;
+    }
+
+    scalar_t value_prime(scalar_t density) const
+    {
+        return k_stiffness / unit_density;
+    }
+};
+
 template<class TCoordinateConfiguration>
 class TaitPressureFromDensity
 {

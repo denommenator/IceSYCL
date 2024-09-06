@@ -193,6 +193,7 @@ public:
     pgi_manager{std::move(interaction_manager_instance)},
     particle_data{std::move(particle_data)},
     node_data{particle_count * InterpolationScheme::num_interactions_per_particle},
+    descent_data{node_data.max_node_count},
     collision_walls{std::move(walls)}
     {}
 
@@ -218,21 +219,46 @@ public:
         max_node_count{max_node_count},
         masses{max_node_count},
         momenta{max_node_count},
+        predicted_positions{max_node_count},
+        inertial_positions{max_node_count},
         velocities{max_node_count}
         {}
         const size_t max_node_count;
         sycl::buffer<scalar_t> masses;
         sycl::buffer<Coordinate_t> momenta;
+        sycl::buffer<Coordinate_t> predicted_positions;
+        sycl::buffer<Coordinate_t> inertial_positions;
         sycl::buffer<Coordinate_t> velocities;
     };
 
     NodeData node_data;
 
+    struct DescentData
+    {
+        explicit DescentData(size_t max_node_count) :
+        max_node_count{max_node_count},
+        descent_direction{max_node_count},
+        descent_direction_prev{max_node_count},
+        gradient{max_node_count},
+        gradient_prev{max_node_count}
+        {}
+        const size_t max_node_count;
+        sycl::buffer<Coordinate_t> descent_direction;
+        sycl::buffer<Coordinate_t> descent_direction_prev;
+        sycl::buffer<Coordinate_t> gradient;
+        sycl::buffer<Coordinate_t> gradient_prev;
+    };
+
+    DescentData descent_data;
+
     sycl::buffer<ElasticCollisionWall<CoordinateConfiguration>> collision_walls;
 
 public:
     template<typename ConstitutiveModel>
-    void step_frame(const ConstitutiveModel Psi, const double mu_velocity_damping = 1.0);
+    void step_frame(const ConstitutiveModel Psi, const size_t num_steps_per_frame = 50, const double mu_velocity_damping = 1.0)
+    {step_frame_explicit(Psi, num_steps_per_frame, mu_velocity_damping);}
+    template<typename ConstitutiveModel>
+    void step_frame_explicit(const ConstitutiveModel Psi, const size_t num_steps_per_frame = 50, const double mu_velocity_damping = 1.0);
     void transer_mass_particles_to_nodes(sycl::queue& q);
     void transfer_momentum_particles_to_nodes_APIC(sycl::queue& q);
     void apply_particle_forces_to_grid(sycl::queue& q, sycl::buffer<ElasticCollisionWall<CoordinateConfiguration>>& walls, scalar_t dt);
@@ -243,11 +269,21 @@ public:
     void transfer_velocity_nodes_to_particles_APIC(sycl::queue& q);
     void update_particle_deformation_gradients(sycl::queue& q, scalar_t dt);
 
+
+    void setup_descent_objective(sycl::queue& q, const scalar_t dt);
+    template<typename ConstitutiveModel>
+    void step_frame_implicit(const ConstitutiveModel Psi, const size_t num_steps_per_frame = 50, const double mu_velocity_damping = 1.0);
+
+    void update_particle_deformation_gradients_implicit(sycl::queue& q, scalar_t dt);
+    template<typename ConstitutiveModel>
+    void compute_descent_gradient(sycl::queue& q, const ConstitutiveModel Psi, scalar_t dt);
+
 };
 
 }
 
 
 #include "engine_impl.ipp"
+#include "descent_impl.ipp"
 
 #endif //ENGINE_HPP
