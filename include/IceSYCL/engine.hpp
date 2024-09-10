@@ -276,7 +276,7 @@ public:
 
     void update_particle_deformation_gradients_implicit(sycl::queue& q, scalar_t dt);
     template<typename ConstitutiveModel>
-    void compute_descent_gradient(sycl::queue& q, const ConstitutiveModel Psi, scalar_t dt);
+    void compute_descent_gradient(sycl::queue& q, const ConstitutiveModel Psi, scalar_t dt, const double gravity);
 
 };
 

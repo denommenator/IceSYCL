@@ -144,7 +144,11 @@ void Engine<TInterpolationScheme>::update_particle_deformation_gradients_implici
 
 template<class TInterpolationScheme>
 template<typename ConstitutiveModel>
-void Engine<TInterpolationScheme>::compute_descent_gradient(sycl::queue& q, const ConstitutiveModel Psi, scalar_t dt)
+void Engine<TInterpolationScheme>::compute_descent_gradient(
+        sycl::queue& q,
+        const ConstitutiveModel Psi,
+        scalar_t dt,
+        const double gravity)
 {
     auto interaction_access = pgi_manager.kernel_accessor;
     auto n = interpolator;
@@ -188,7 +192,7 @@ void Engine<TInterpolationScheme>::compute_descent_gradient(sycl::queue& q, cons
 
             }
 
-            descent_gradient_acc[node_id] += grad_i;
+            descent_gradient_acc[node_id] = grad_i;
         });
     });
 
@@ -196,7 +200,9 @@ void Engine<TInterpolationScheme>::compute_descent_gradient(sycl::queue& q, cons
     q.submit([&](sycl::handler& h) {
         sycl::accessor node_mass_acc(node_data.masses, h);
         sycl::accessor node_predicted_positions_acc(node_data.positions, h);
+        sycl::accessor node_inertial_positions_acc(node_data.inertial_positions, h);
         sycl::accessor descent_gradient_acc(descent_data.gradient, h);
+        sycl::accessor walls_acc(collision_walls, h);
 
 
         interaction_access.give_kernel_access(h);
@@ -206,9 +212,24 @@ void Engine<TInterpolationScheme>::compute_descent_gradient(sycl::queue& q, cons
             const size_t node_id = idx[0];
             if (node_id >= node_count)
                 return;
-            //TODO FINISH IMPLEMET
+
+            Coordinate_t gravity_vec = Coordinate_t(0.0, gravity);
+            NodeIndex_t node_index = interaction_access.get_node_index(node_id);
+            scalar_t mass_i = node_mass_acc[node_id];
+            Coordinate_t inertial_position = node_inertial_positions_acc[node_id];
+            Coordinate_t node_predicted_position = node_predicted_positions_acc[node_id];
+
+            descent_gradient_acc[node_id] += mass_i * gravity_vec.dot(node_predicted_position);
+            descent_gradient_acc[node_id] += mass_i / (dt * dt) * (node_predicted_position - inertial_position);
+
+            for(ElasticCollisionWall<CoordinateConfiguration>& wall : walls_acc)
+            {
+                descent_gradient_acc[node_id] += wall.gradient(node_predicted_position);
+            }
         });
     });
+
+
 
 
 }
