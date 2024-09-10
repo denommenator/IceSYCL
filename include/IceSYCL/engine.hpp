@@ -237,16 +237,28 @@ public:
     {
         explicit DescentData(size_t max_node_count) :
         max_node_count{max_node_count},
+        node_positions_plus{max_node_count},
         descent_direction{max_node_count},
         descent_direction_prev{max_node_count},
         gradient{max_node_count},
-        gradient_prev{max_node_count}
+        gradient_plus{max_node_count},
+        gradient_prev{max_node_count},
+        descent_direction_dot_grad{1},
+        descent_direction_dot_grad_plus{1},
+        directional_hessian{1},
+        alpha_step{1}
         {}
         const size_t max_node_count;
+        sycl::buffer<Coordinate_t> node_positions_plus;
         sycl::buffer<Coordinate_t> descent_direction;
         sycl::buffer<Coordinate_t> descent_direction_prev;
         sycl::buffer<Coordinate_t> gradient;
+        sycl::buffer<Coordinate_t> gradient_plus;
         sycl::buffer<Coordinate_t> gradient_prev;
+        sycl::buffer<scalar_t> descent_direction_dot_grad;
+        sycl::buffer<scalar_t> descent_direction_dot_grad_plus;
+        sycl::buffer<scalar_t> directional_hessian;
+        sycl::buffer<scalar_t> alpha_step;
     };
 
     DescentData descent_data;
@@ -276,7 +288,7 @@ public:
 
     void update_particle_deformation_gradients_implicit(sycl::queue& q, scalar_t dt);
     template<typename ConstitutiveModel>
-    void compute_descent_gradient(sycl::queue& q, const ConstitutiveModel Psi, scalar_t dt, const double gravity);
+    void compute_descent_gradient(sycl::queue& q, const ConstitutiveModel Psi, scalar_t dt, const double gravity, sycl::buffer<Coordinate_t> &node_positions, sycl::buffer<Coordinate_t> &gradient_destination);
 
 };
 

@@ -44,6 +44,49 @@ inline constexpr float pow<3, float>(float base){ return base * base * base; }
 template<>
 inline constexpr int pow<3, int>(int base){ return base * base * base; }
 
+template<class TCoordinate>
+void initial_vec_dot(
+        sycl::queue& q,
+        size_t count_limit,
+        sycl::buffer<size_t>& actual_count,
+        sycl::buffer<TCoordinate>& v,
+        sycl::buffer<TCoordinate>& w,
+        sycl::buffer<TCoordinate>& result
+        )
+{
+//    q.submit([&](sycl::handler& h)
+//     {
+//        sycl::accessor result_acc(result);
+//        h.single_task([=]()
+//          {
+//              result_acc[0] = TCoordinate::Zero();
+//          });
+//     });
+
+    q.submit([&](sycl::handler& h)
+     {
+        sycl::accessor v_acc(v);
+        sycl::accessor w_acc(w);
+        sycl::accessor count_acc(actual_count);
+
+        h.parallel_for(
+                count_limit,
+                sycl::reduction(
+                        result,
+                        h,
+                        std::plus<TCoordinate>(),
+                        {sycl::property_list {sycl::property::reduction::initialize_to_identity()}}),
+                [=](sycl::id<1> idx, auto& sum)
+                {
+                    size_t id = idx[0];
+                    size_t count = count_acc[0];
+                    if(id >= count)
+                        return;
+                    sum += v_acc[id].dot(w_acc[id]);
+                });
+     });
+}
+
 }
 
 #endif //UTILITY_HPP
