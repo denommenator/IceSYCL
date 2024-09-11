@@ -114,6 +114,22 @@ EXPORT_API void step_frame(Engine2D* engine, int num_steps_per_frame, double c_s
     engine->step_frame(Psi, num_steps_per_frame, mu_damping, gravity);
 }
 
+EXPORT_API void step_frame_implicit(Engine2D* engine, int num_steps_per_frame, int num_descent_steps, double c_speed_of_sound, double mu_damping, double gravity)
+{
+    using namespace iceSYCL;
+    using CoordinateConfiguration = Engine2D::CoordinateConfiguration;
+    //using ConstitutiveModel = DensityBasedConstitutiveModel<TaitPressureFromDensity<CoordinateConfiguration>>;
+
+    using ConstitutiveModel = FixedCorotated<CoordinateConfiguration>;
+    ConstitutiveModel Psi{FixedCorotated<CoordinateConfiguration>{c_speed_of_sound, 0.0}};
+
+//    using ConstitutiveModel = DensityBasedConstitutiveModel<IdealGasFromDensity<CoordinateConfiguration>>;
+//    ConstitutiveModel Psi{IdealGasFromDensity<CoordinateConfiguration>{1.0, c_speed_of_sound}};
+
+
+    engine->step_frame_implicit(Psi, num_steps_per_frame, num_descent_steps, mu_damping, gravity);
+}
+
 
 EXPORT_API void delete_engine(Engine2D* engine)
 {

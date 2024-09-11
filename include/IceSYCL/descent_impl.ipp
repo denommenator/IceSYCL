@@ -52,8 +52,9 @@ void Engine<TInterpolationScheme>::step_frame_implicit(const ConstitutiveModel P
             update_particle_deformation_gradients_implicit(q, dt);
         }
 
-        transfer_velocity_nodes_to_particles_APIC(q);
         compute_node_velocities_implicit(q, dt);
+        transfer_velocity_nodes_to_particles_APIC(q);
+
         apply_particle_velocities_with_aether_damping(q, dt, mu_step);
 
 
@@ -362,30 +363,30 @@ void Engine<TInterpolationScheme>::initial_step(
 
 }
 
-template<class TInterpolationScheme>
-void Engine<TInterpolationScheme>::compute_particle_velocities(sycl::queue &q, const scalar_t dt)
-{
-    auto n = interpolator;
-    auto interaction_access = pgi_manager.kernel_accessor;
-    q.submit([&](sycl::handler &h)
-             {
-                 sycl::accessor particle_positions_acc(particle_data.positions, h);
-                 sycl::accessor particle_positions_prev_acc(particle_data.positions_prev, h);
-                 sycl::accessor particle_velocities_acc(node_data.velocities, h);
-
-                 interaction_access.give_kernel_access(h);
-
-                 h.parallel_for(particle_count, [=](sycl::id<1> idx)
-                 {
-                     size_t pid = idx[0];
-                     Coordinate_t x_p = particle_positions_acc[pid];
-                     Coordinate_t x_p_prev = particle_positions_prev_acc[pid];
-
-                     particle_velocities_acc[pid] = 1.0 / dt * (x_p - x_p_prev);
-                 });
-             });
-
-}
+//template<class TInterpolationScheme>
+//void Engine<TInterpolationScheme>::compute_particle_velocities(sycl::queue &q, const scalar_t dt)
+//{
+//    auto n = interpolator;
+//    auto interaction_access = pgi_manager.kernel_accessor;
+//    q.submit([&](sycl::handler &h)
+//             {
+//                 sycl::accessor particle_positions_acc(particle_data.positions, h);
+//                 sycl::accessor particle_positions_prev_acc(particle_data.positions_prev, h);
+//                 sycl::accessor particle_velocities_acc(node_data.velocities, h);
+//
+//                 interaction_access.give_kernel_access(h);
+//
+//                 h.parallel_for(particle_count, [=](sycl::id<1> idx)
+//                 {
+//                     size_t pid = idx[0];
+//                     Coordinate_t x_p = particle_positions_acc[pid];
+//                     Coordinate_t x_p_prev = particle_positions_prev_acc[pid];
+//
+//                     particle_velocities_acc[pid] = 1.0 / dt * (x_p - x_p_prev);
+//                 });
+//             });
+//
+//}
 
 template<class TInterpolationScheme>
 void Engine<TInterpolationScheme>::compute_node_velocities_implicit(sycl::queue& q, const scalar_t dt)
@@ -398,13 +399,11 @@ void Engine<TInterpolationScheme>::compute_node_velocities_implicit(sycl::queue&
          sycl::accessor node_velocity_acc(node_data.velocities, h);
          sycl::accessor node_position_acc(node_data.predicted_positions, h);
 
-         sycl::accessor node_count_acc(pgi_manager.node_count, h);
-
          interaction_access.give_kernel_access(h);
 
          h.parallel_for(node_data.max_node_count,[=](sycl::id<1> idx)
          {
-             const size_t node_count = node_count_acc[0];
+             const size_t node_count = interaction_access.node_count();
              const size_t node_id = idx[0];
              if(node_id >= node_count)
                  return;
