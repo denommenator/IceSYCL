@@ -290,6 +290,8 @@ public:
     void update_particle_deformation_gradients_implicit(sycl::queue& q, scalar_t dt);
     template<typename ConstitutiveModel>
     void compute_descent_gradient(sycl::queue& q, const ConstitutiveModel Psi, scalar_t dt, const double gravity, sycl::buffer<Coordinate_t> &node_positions, sycl::buffer<Coordinate_t> &gradient_destination);
+    template<typename ConstitutiveModel>
+    void compute_descent_value(sycl::queue& q, const ConstitutiveModel Psi, scalar_t dt, const double gravity, sycl::buffer<Coordinate_t> &node_positions, sycl::buffer<Coordinate_t> &value_destination);
     void set_descent_direction(sycl::queue &q);
     template<typename ConstitutiveModel>
     void compute_directional_hessian(sycl::queue &q, const ConstitutiveModel Psi,scalar_t dt, const double gravity);

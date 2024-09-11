@@ -47,3 +47,45 @@ TEST_CASE( "Dot product test", "[utility_test]" )
 
     CHECK(result[0] == actual_count * dimension);
 }
+
+TEST_CASE( "reduction without initialize", "[utility_test]" )
+{
+    using scalar_t = double;
+
+    size_t count = 10;
+    double init = 100;
+
+    std::vector<scalar_t> v(count, 1.0);
+    std::vector<scalar_t> result = {init};
+
+
+    {
+        sycl::buffer v_B(v);
+        sycl::buffer result_B(result);
+
+        sycl::queue q{};
+
+        q.submit([&](sycl::handler& h){
+            sycl::accessor v_acc(v_B, h);
+            sycl::accessor result_acc(result_B, h);
+
+            h.parallel_for(
+                    count,
+                    sycl::reduction(
+                            result_B,
+                            h,
+                            std::plus<scalar_t>(),
+                            {}
+                            ),
+                    [=](sycl::id<1> idx, auto& sum)
+                    {
+                        size_t id = idx[0];
+                        sum += v_acc[id];
+                    }
+                    );
+        });
+        q.wait();
+    }
+
+    CHECK(result[0] == init + count);
+}

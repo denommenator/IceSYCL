@@ -75,7 +75,8 @@ void initial_vec_dot(
                     result,
                     h,
                     std::plus<typename TCoordinate::scalar_t>(),
-                    {sycl::property_list {sycl::property::reduction::initialize_to_identity()}}),
+                    {sycl::property_list {sycl::property::reduction::initialize_to_identity()}}
+                    ),
             [=](sycl::id<1> idx, auto& sum)
             {
                 size_t id = idx[0];

@@ -129,12 +129,23 @@ public:
 
     scalar_t lambda;
     scalar_t mu;
-    /*
+
     scalar_t value(CoordinateMatrix_t F) const
     {
+        CoordinateMatrix_t U, Sigma, V;
+        small_la::SVD(F, U, Sigma, V);
 
+        scalar_t ret = 0;
+
+        for(int i = 0; i < CoordinateMatrix_t::num_rows; ++i)
+        {
+            ret += mu * (Sigma(i,i) - 1.0) * (Sigma(i,i) - 1.0);
+        }
+
+        scalar_t J = small_la::det(F);
+        ret += lambda / 2.0 * (J - 1) * (J - 1);
+        return ret;
     }
-    */
 
     CoordinateMatrix_t PK(CoordinateMatrix_t F) const
     {

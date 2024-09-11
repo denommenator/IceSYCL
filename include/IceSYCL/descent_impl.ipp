@@ -248,6 +248,93 @@ void Engine<TInterpolationScheme>::compute_descent_gradient(
      });
 }
 
+
+template<class TInterpolationScheme>
+template<typename ConstitutiveModel>
+void Engine<TInterpolationScheme>::compute_descent_value(
+        sycl::queue &q,
+        const ConstitutiveModel Psi,
+        scalar_t dt,
+        const double gravity,
+        sycl::buffer<Coordinate_t> &node_positions,
+        sycl::buffer<Coordinate_t> &value_destination
+)
+{
+    auto interaction_access = pgi_manager.kernel_accessor;
+    auto n = interpolator;
+    //MPM forces
+    q.submit([&](sycl::handler &h)
+     {
+         sycl::accessor deformation_gradient_acc(particle_data.deformation_gradients, h);
+         sycl::accessor rest_volume_acc(particle_data.rest_volumes, h);
+
+
+         interaction_access.give_kernel_access(h);
+
+         h.parallel_for(
+             particle_data.particle_count,
+             sycl::reduction(
+                     value_destination,
+                     h,
+                     std::plus<scalar_t>(),
+                     {sycl::property_list {sycl::property::reduction::initialize_to_identity()}}
+                     ),
+             [=](sycl::id<1> idx, auto& sum)
+             {
+                 size_t pid = idx[0];
+                 scalar_t V_p = rest_volume_acc[pid];
+
+                 CoordinateMatrix_t F = deformation_gradient_acc[pid];
+                 scalar_t psi_value = Psi.value(F);
+
+                 sum += V_p * psi_value;
+             });
+     });
+
+
+    //inertia + walls + gravity
+    q.submit([&](sycl::handler &h)
+     {
+         sycl::accessor node_mass_acc(node_data.masses, h);
+         sycl::accessor node_predicted_positions_acc(node_positions, h);
+         sycl::accessor node_inertial_positions_acc(node_data.inertial_positions, h);
+         sycl::accessor walls_acc(collision_walls, h);
+
+
+         interaction_access.give_kernel_access(h);
+
+         h.parallel_for(
+                 node_data.max_node_count,
+                 sycl::reduction(
+                         value_destination,
+                         h,
+                         std::plus<scalar_t>(),
+                         {}
+                 ),
+                 [=](sycl::id<1> idx, auto& sum)
+                 {
+                     const size_t node_count = interaction_access.node_count();
+                     const size_t node_id = idx[0];
+                     if (node_id >= node_count)
+                         return;
+
+                     Coordinate_t gravity_vec = Coordinate_t(0.0, gravity);
+                     NodeIndex_t node_index = interaction_access.get_node_index(node_id);
+                     scalar_t mass_i = node_mass_acc[node_id];
+                     Coordinate_t inertial_position = node_inertial_positions_acc[node_id];
+                     Coordinate_t node_predicted_position = node_predicted_positions_acc[node_id];
+
+                     sum += mass_i * gravity_vec.dot(node_predicted_position);
+                     sum += mass_i / (2.0 * dt * dt) * (node_predicted_position - inertial_position).dot(node_predicted_position - inertial_position);
+
+                     for (ElasticCollisionWall<CoordinateConfiguration> &wall: walls_acc)
+                     {
+                         sum += wall.value(node_predicted_position);
+                     }
+         });
+     });
+}
+
 template<class TInterpolationScheme>
 void Engine<TInterpolationScheme>::set_descent_direction(
         sycl::queue &q
