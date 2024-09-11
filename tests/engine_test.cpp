@@ -163,7 +163,18 @@ TEST_CASE( "First implicit engine test!", "[engine_test]" )
 //    Psi.pressure.gamma = 3.0;
 //    Psi.pressure.c = 100;
     //for(int i = 0; i < 50 * 2; ++i)
-    engine.step_frame_implicit(Psi, 1, 20);
+    engine.step_frame_implicit(Psi, 1, 1);
+
+    {
+        sycl::host_accessor directional_gradient_acc(engine.descent_data.descent_direction_dot_grad);
+        sycl::host_accessor directional_hessian_acc(engine.descent_data.directional_hessian);
+
+        std::cout << "directional derivative: " << directional_gradient_acc[0] << std::endl;
+        std::cout << "directional hessian: " << directional_hessian_acc[0] << std::endl;
+        std::cout << "ratio: " << -directional_gradient_acc[0] / directional_hessian_acc[0] << std::endl;
+
+
+    }
 
     {
         sycl::host_accessor particle_positions_acc(engine.particle_data.positions);

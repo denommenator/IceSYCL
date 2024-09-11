@@ -59,6 +59,7 @@ void Engine<TInterpolationScheme>::step_frame_implicit(const ConstitutiveModel P
 
 
     }
+    q.wait();
 
 }
 
@@ -171,7 +172,7 @@ void Engine<TInterpolationScheme>::compute_descent_gradient(
      {
          sycl::accessor particle_mass_acc(particle_data.masses, h);
          sycl::accessor particle_positions_acc(particle_data.positions, h);
-         sycl::accessor descent_gradient_acc(descent_data.gradient, h);
+         sycl::accessor descent_gradient_acc(gradient_destination, h);
          sycl::accessor deformation_gradient_acc(particle_data.deformation_gradients, h);
          sycl::accessor deformation_gradient_prev_acc(particle_data.deformation_gradients_prev, h);
          sycl::accessor rest_volume_acc(particle_data.rest_volumes, h);
