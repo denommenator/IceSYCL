@@ -51,12 +51,12 @@ void initial_vec_dot(
         sycl::buffer<size_t>& actual_count,
         sycl::buffer<TCoordinate>& v,
         sycl::buffer<TCoordinate>& w,
-        sycl::buffer<TCoordinate>& result
+        sycl::buffer<typename TCoordinate::scalar_t>& result
         )
 {
 //    q.submit([&](sycl::handler& h)
 //     {
-//        sycl::accessor result_acc(result);
+//        sycl::accessor result_acc(result, h);
 //        h.single_task([=]()
 //          {
 //              result_acc[0] = TCoordinate::Zero();
@@ -65,16 +65,16 @@ void initial_vec_dot(
 
     q.submit([&](sycl::handler& h)
      {
-        sycl::accessor v_acc(v);
-        sycl::accessor w_acc(w);
-        sycl::accessor count_acc(actual_count);
+        sycl::accessor v_acc(v, h);
+        sycl::accessor w_acc(w, h);
+        sycl::accessor count_acc(actual_count, h);
 
         h.parallel_for(
                 count_limit,
                 sycl::reduction(
                         result,
                         h,
-                        std::plus<TCoordinate>(),
+                        std::plus<typename TCoordinate::scalar_t>(),
                         {sycl::property_list {sycl::property::reduction::initialize_to_identity()}}),
                 [=](sycl::id<1> idx, auto& sum)
                 {
@@ -82,7 +82,7 @@ void initial_vec_dot(
                     size_t count = count_acc[0];
                     if(id >= count)
                         return;
-                    sum += v_acc[id].dot(w_acc[id]);
+                    sum.combine(v_acc[id].dot(w_acc[id]));
                 });
      });
 }

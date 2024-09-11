@@ -38,7 +38,7 @@ void Engine<TInterpolationScheme>::step_frame_implicit(const ConstitutiveModel P
         pgi_manager.update_particle_locations(q, particle_data.positions, interpolator);
 
         compute_node_inertial_positions(q, dt);
-        update_particle_deformation_gradients_implicit(q);
+        update_particle_deformation_gradients_implicit(q, dt);
         for(size_t descent_step = 0; descent_step < num_descent_steps; ++descent_step)
         {
             compute_descent_gradient(q, Psi, dt, gravity, node_data.predicted_positions, descent_data.gradient);
@@ -49,7 +49,7 @@ void Engine<TInterpolationScheme>::step_frame_implicit(const ConstitutiveModel P
 
             initial_step(q);
 
-            update_particle_deformation_gradients_implicit(q);
+            update_particle_deformation_gradients_implicit(q, dt);
         }
 
         transfer_velocity_nodes_to_particles_APIC(q);
@@ -72,7 +72,7 @@ void Engine<TInterpolationScheme>::compute_node_inertial_positions(sycl::queue &
     auto n = interpolator;
     q.submit([&](sycl::handler &h)
      {
-         sycl::accessor positions_acc(node_data.positions, h);
+         sycl::accessor positions_acc(node_data.predicted_positions, h);
          sycl::accessor inertial_positions_acc(node_data.inertial_positions, h);
          sycl::accessor velocities_acc(node_data.velocities, h);
          interaction_access.give_kernel_access(h);
@@ -234,7 +234,7 @@ void Engine<TInterpolationScheme>::compute_descent_gradient(
                      Coordinate_t inertial_position = node_inertial_positions_acc[node_id];
                      Coordinate_t node_predicted_position = node_predicted_positions_acc[node_id];
 
-                     descent_gradient_acc[node_id] += mass_i * gravity_vec.dot(node_predicted_position);
+                     descent_gradient_acc[node_id] += mass_i * gravity_vec;//.dot(node_predicted_position);
                      descent_gradient_acc[node_id] +=
                              mass_i / (dt * dt) * (node_predicted_position - inertial_position);
 
@@ -311,9 +311,9 @@ void Engine<TInterpolationScheme>::compute_directional_hessian(
 
     q.submit([&](sycl::handler& h)
      {
-        sycl::accessor directional_hessian_acc(descent_data.directional_hessian);
-        sycl::accessor descent_direction_dot_grad_acc(descent_data.descent_direction_dot_grad);
-        sycl::accessor descent_direction_dot_grad_plus_acc(descent_data.descent_direction_dot_grad_plus);
+        sycl::accessor directional_hessian_acc(descent_data.directional_hessian, h);
+        sycl::accessor descent_direction_dot_grad_acc(descent_data.descent_direction_dot_grad, h);
+        sycl::accessor descent_direction_dot_grad_plus_acc(descent_data.descent_direction_dot_grad_plus, h);
 
         h.single_task([=]()
           {
@@ -331,9 +331,9 @@ void Engine<TInterpolationScheme>::initial_step(
 
     q.submit([&](sycl::handler& h)
      {
-         sycl::accessor directional_hessian_acc(descent_data.directional_hessian);
-         sycl::accessor descent_direction_dot_grad_acc(descent_data.descent_direction_dot_grad);
-         sycl::accessor alpha_step_acc(descent_data.alpha_step);
+         sycl::accessor directional_hessian_acc(descent_data.directional_hessian, h);
+         sycl::accessor descent_direction_dot_grad_acc(descent_data.descent_direction_dot_grad, h);
+         sycl::accessor alpha_step_acc(descent_data.alpha_step, h);
 
          h.single_task([=]()
            {
@@ -344,7 +344,7 @@ void Engine<TInterpolationScheme>::initial_step(
     q.submit([&](sycl::handler &h)
      {
          sycl::accessor node_positions_acc(node_data.predicted_positions, h);
-         sycl::accessor alpha_step_acc(descent_data.alpha_step);
+         sycl::accessor alpha_step_acc(descent_data.alpha_step, h);
          sycl::accessor descent_direction_acc(descent_data.descent_direction, h);
 
          interaction_access.give_kernel_access(h);
@@ -399,6 +399,8 @@ void Engine<TInterpolationScheme>::compute_node_velocities_implicit(sycl::queue&
          sycl::accessor node_position_acc(node_data.predicted_positions, h);
 
          sycl::accessor node_count_acc(pgi_manager.node_count, h);
+
+         interaction_access.give_kernel_access(h);
 
          h.parallel_for(node_data.max_node_count,[=](sycl::id<1> idx)
          {

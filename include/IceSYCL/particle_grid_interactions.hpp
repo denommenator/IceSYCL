@@ -372,7 +372,7 @@ public:
             return interactions_by_node_acc.begin() + begin + count;
         }
 
-        NodeIndex_t get_node_index(size_t node_id)
+        NodeIndex_t get_node_index(size_t node_id) const
         {
             return node_data_acc[node_id].node_index;
         }
