@@ -169,9 +169,9 @@ TEST_CASE( "First implicit engine test!", "[engine_test]" )
         sycl::host_accessor directional_gradient_acc(engine.descent_data.descent_direction_dot_grad);
         sycl::host_accessor directional_hessian_acc(engine.descent_data.directional_hessian);
 
-        std::cout << "directional derivative: " << directional_gradient_acc[0] << std::endl;
-        std::cout << "directional hessian: " << directional_hessian_acc[0] << std::endl;
-        std::cout << "ratio: " << -directional_gradient_acc[0] / directional_hessian_acc[0] << std::endl;
+//        std::cout << "directional derivative: " << directional_gradient_acc[0] << std::endl;
+//        std::cout << "directional hessian: " << directional_hessian_acc[0] << std::endl;
+//        std::cout << "ratio: " << -directional_gradient_acc[0] / directional_hessian_acc[0] << std::endl;
 
 
     }

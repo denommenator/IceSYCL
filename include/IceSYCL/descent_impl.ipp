@@ -49,6 +49,8 @@ void Engine<TInterpolationScheme>::step_frame_implicit(const ConstitutiveModel P
 
             initial_step(q);
 
+            back_trace_line_search(q, Psi, dt, gravity);
+
             update_particle_deformation_gradients_implicit(q, dt);
         }
 
@@ -257,7 +259,8 @@ void Engine<TInterpolationScheme>::compute_descent_value(
         scalar_t dt,
         const double gravity,
         sycl::buffer<Coordinate_t> &node_positions,
-        sycl::buffer<Coordinate_t> &value_destination
+        sycl::buffer<scalar_t> &value_destination,
+        sycl::buffer<bool>& continue_line_search_flag
 )
 {
     auto interaction_access = pgi_manager.kernel_accessor;
@@ -267,7 +270,7 @@ void Engine<TInterpolationScheme>::compute_descent_value(
      {
          sycl::accessor deformation_gradient_acc(particle_data.deformation_gradients, h);
          sycl::accessor rest_volume_acc(particle_data.rest_volumes, h);
-
+         sycl::accessor continue_line_search_flag_acc(descent_data.continue_line_search_flag, h);
 
          interaction_access.give_kernel_access(h);
 
@@ -281,6 +284,8 @@ void Engine<TInterpolationScheme>::compute_descent_value(
                      ),
              [=](sycl::id<1> idx, auto& sum)
              {
+                 if(!continue_line_search_flag_acc[0])
+                     return;
                  size_t pid = idx[0];
                  scalar_t V_p = rest_volume_acc[pid];
 
@@ -299,7 +304,7 @@ void Engine<TInterpolationScheme>::compute_descent_value(
          sycl::accessor node_predicted_positions_acc(node_positions, h);
          sycl::accessor node_inertial_positions_acc(node_data.inertial_positions, h);
          sycl::accessor walls_acc(collision_walls, h);
-
+         sycl::accessor continue_line_search_flag_acc(descent_data.continue_line_search_flag, h);
 
          interaction_access.give_kernel_access(h);
 
@@ -313,6 +318,8 @@ void Engine<TInterpolationScheme>::compute_descent_value(
                  ),
                  [=](sycl::id<1> idx, auto& sum)
                  {
+                     if(!continue_line_search_flag_acc[0])
+                         return;
                      const size_t node_count = interaction_access.node_count();
                      const size_t node_id = idx[0];
                      if (node_id >= node_count)
@@ -433,6 +440,7 @@ void Engine<TInterpolationScheme>::initial_step(
     q.submit([&](sycl::handler &h)
      {
          sycl::accessor node_positions_acc(node_data.predicted_positions, h);
+         sycl::accessor node_line_search_positions_acc(descent_data.node_line_search_positions, h);
          sycl::accessor alpha_step_acc(descent_data.alpha_step, h);
          sycl::accessor descent_direction_acc(descent_data.descent_direction, h);
 
@@ -444,7 +452,7 @@ void Engine<TInterpolationScheme>::initial_step(
              const size_t node_id = idx[0];
              if (node_id >= node_count)
                  return;
-             node_positions_acc[node_id] =
+             node_line_search_positions_acc[node_id] =
                      node_positions_acc[node_id] + alpha_step_acc[0] * descent_direction_acc[node_id];
          });
      });
@@ -503,6 +511,83 @@ void Engine<TInterpolationScheme>::compute_node_velocities_implicit(sycl::queue&
              node_velocity_acc[node_id] = 1.0 / dt * (node_position_acc[node_id] - x_i);
          });
      });
+}
+
+
+template<class TInterpolationScheme>
+template<typename ConstitutiveModel>
+void Engine<TInterpolationScheme>::back_trace_line_search(
+        sycl::queue &q,
+        const ConstitutiveModel Psi,
+        scalar_t dt,
+        const double gravity
+)
+{
+    auto q_policy = dpl::execution::make_device_policy(q);
+
+    auto interaction_access = pgi_manager.kernel_accessor;
+    q.submit([&](sycl::handler& h){
+        sycl::accessor continue_line_search_flag_acc(descent_data.continue_line_search_flag, h);
+        h.single_task([=](){continue_line_search_flag_acc[0] = true;});
+    });
+
+    compute_descent_value(q, Psi, dt, gravity, node_data.predicted_positions, descent_data.descent_value_0, descent_data.continue_line_search_flag);
+    int max_backtrace_steps = 20;
+    scalar_t rho = 0.5;
+    for(int i = 0; i < max_backtrace_steps; ++i)
+    {
+        compute_descent_value(q, Psi, dt, gravity, descent_data.node_line_search_positions, descent_data.descent_value,
+                              descent_data.continue_line_search_flag);
+
+        q.submit([&](sycl::handler& h){
+            sycl::accessor continue_line_search_flag_acc(descent_data.continue_line_search_flag, h);
+            sycl::accessor descent_value_0_acc(descent_data.descent_value_0, h);
+            sycl::accessor descent_value_acc(descent_data.descent_value, h);
+            sycl::accessor alpha_step_acc(descent_data.alpha_step, h);
+
+            h.single_task([=](){
+                if(!continue_line_search_flag_acc[0] )
+                    return;
+                if(descent_value_acc[0] < descent_value_0_acc[0])
+                {
+                    continue_line_search_flag_acc[0] = false;
+                    return;
+                }
+                alpha_step_acc[0] = rho * alpha_step_acc[0];
+
+            });
+        });
+
+        q.submit([&](sycl::handler& h){
+            sycl::accessor descent_value_0_acc(descent_data.descent_value_0, h);
+            sycl::accessor descent_value_acc(descent_data.descent_value, h);
+            sycl::accessor alpha_step_acc(descent_data.alpha_step, h);
+            sycl::accessor node_positions_acc(node_data.predicted_positions, h);
+            sycl::accessor node_line_search_positions_acc(descent_data.node_line_search_positions, h);
+            sycl::accessor descent_direction_acc(descent_data.descent_direction, h);
+
+            interaction_access.give_kernel_access(h);
+
+            h.parallel_for(node_data.max_node_count,[=](sycl::id<1> idx)
+            {
+                if(descent_value_acc[0] < descent_value_0_acc[0])
+                    return;
+                const size_t node_count = interaction_access.node_count();
+                const size_t node_id = idx[0];
+                if(node_id >= node_count)
+                    return;
+
+                node_line_search_positions_acc[node_id] =
+                        node_positions_acc[node_id] + alpha_step_acc[0] * descent_direction_acc[node_id];
+
+            });
+        });
+
+
+    }
+    dpl::copy(q_policy, dpl::begin(descent_data.node_line_search_positions), dpl::end(descent_data.node_line_search_positions),
+              dpl::begin(node_data.predicted_positions));
+
 }
 
 }
