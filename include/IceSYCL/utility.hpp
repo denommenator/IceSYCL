@@ -70,20 +70,20 @@ void initial_vec_dot(
         sycl::accessor count_acc(actual_count, h);
 
         h.parallel_for(
-                count_limit,
-                sycl::reduction(
-                        result,
-                        h,
-                        std::plus<typename TCoordinate::scalar_t>(),
-                        {sycl::property_list {sycl::property::reduction::initialize_to_identity()}}),
-                [=](sycl::id<1> idx, auto& sum)
-                {
-                    size_t id = idx[0];
-                    size_t count = count_acc[0];
-                    if(id >= count)
-                        return;
-                    sum.combine(v_acc[id].dot(w_acc[id]));
-                });
+            count_limit,
+            sycl::reduction(
+                    result,
+                    h,
+                    std::plus<typename TCoordinate::scalar_t>(),
+                    {sycl::property_list {sycl::property::reduction::initialize_to_identity()}}),
+            [=](sycl::id<1> idx, auto& sum)
+            {
+                size_t id = idx[0];
+                size_t count = count_acc[0];
+                if(id >= count)
+                    return;
+                sum.combine(v_acc[id].dot(w_acc[id]));
+            });
      });
 }
 

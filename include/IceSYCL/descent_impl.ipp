@@ -168,83 +168,83 @@ void Engine<TInterpolationScheme>::compute_descent_gradient(
     auto n = interpolator;
     //MPM forces
     q.submit([&](sycl::handler &h)
+     {
+         sycl::accessor particle_mass_acc(particle_data.masses, h);
+         sycl::accessor particle_positions_acc(particle_data.positions, h);
+         sycl::accessor descent_gradient_acc(descent_data.gradient, h);
+         sycl::accessor deformation_gradient_acc(particle_data.deformation_gradients, h);
+         sycl::accessor deformation_gradient_prev_acc(particle_data.deformation_gradients_prev, h);
+         sycl::accessor rest_volume_acc(particle_data.rest_volumes, h);
+
+
+         interaction_access.give_kernel_access(h);
+
+         h.parallel_for(node_data.max_node_count, [=](sycl::id<1> idx)
+         {
+             const size_t node_count = interaction_access.node_count();
+             const size_t node_id = idx[0];
+             if (node_id >= node_count)
+                 return;
+
+             Coordinate_t grad_i = Coordinate_t::Zero();
+             for (auto interaction_it = interaction_access.node_interactions_begin(node_id);
+                  interaction_it != interaction_access.node_interactions_end(node_id);
+                  ++interaction_it)
              {
-                 sycl::accessor particle_mass_acc(particle_data.masses, h);
-                 sycl::accessor particle_positions_acc(particle_data.positions, h);
-                 sycl::accessor descent_gradient_acc(descent_data.gradient, h);
-                 sycl::accessor deformation_gradient_acc(particle_data.deformation_gradients, h);
-                 sycl::accessor deformation_gradient_prev_acc(particle_data.deformation_gradients_prev, h);
-                 sycl::accessor rest_volume_acc(particle_data.rest_volumes, h);
+                 ParticleNodeInteraction<typename TInterpolationScheme::CoordinateConfiguration> interaction = *interaction_it;
+                 size_t pid = interaction.particle_id;
+                 scalar_t mass_p = particle_mass_acc[pid];
+                 Coordinate_t x_p = particle_positions_acc[pid];
+                 scalar_t V_p = rest_volume_acc[pid];
+                 CoordinateMatrix_t F_prev = deformation_gradient_prev_acc[pid];
+                 CoordinateMatrix_t F = deformation_gradient_acc[pid];
+                 CoordinateMatrix_t PK = Psi.PK(F);
 
+                 NodeIndex_t node_index = interaction.node_index;
 
-                 interaction_access.give_kernel_access(h);
+                 grad_i += V_p * PK * F_prev.transpose() * n.gradient(node_index, x_p);
 
-                 h.parallel_for(node_data.max_node_count, [=](sycl::id<1> idx)
-                 {
-                     const size_t node_count = interaction_access.node_count();
-                     const size_t node_id = idx[0];
-                     if (node_id >= node_count)
-                         return;
+             }
 
-                     Coordinate_t grad_i = Coordinate_t::Zero();
-                     for (auto interaction_it = interaction_access.node_interactions_begin(node_id);
-                          interaction_it != interaction_access.node_interactions_end(node_id);
-                          ++interaction_it)
-                     {
-                         ParticleNodeInteraction<typename TInterpolationScheme::CoordinateConfiguration> interaction = *interaction_it;
-                         size_t pid = interaction.particle_id;
-                         scalar_t mass_p = particle_mass_acc[pid];
-                         Coordinate_t x_p = particle_positions_acc[pid];
-                         scalar_t V_p = rest_volume_acc[pid];
-                         CoordinateMatrix_t F_prev = deformation_gradient_prev_acc[pid];
-                         CoordinateMatrix_t F = deformation_gradient_acc[pid];
-                         CoordinateMatrix_t PK = Psi.PK(F);
-
-                         NodeIndex_t node_index = interaction.node_index;
-
-                         grad_i += V_p * PK * F_prev.transpose() * n.gradient(node_index, x_p);
-
-                     }
-
-                     descent_gradient_acc[node_id] = grad_i;
-                 });
-             });
+             descent_gradient_acc[node_id] = grad_i;
+         });
+     });
 
     //inertia + walls + gravity
     q.submit([&](sycl::handler &h)
+     {
+         sycl::accessor node_mass_acc(node_data.masses, h);
+         sycl::accessor node_predicted_positions_acc(node_positions, h);
+         sycl::accessor node_inertial_positions_acc(node_data.inertial_positions, h);
+         sycl::accessor descent_gradient_acc(gradient_destination, h);
+         sycl::accessor walls_acc(collision_walls, h);
+
+
+         interaction_access.give_kernel_access(h);
+
+         h.parallel_for(node_data.max_node_count, [=](sycl::id<1> idx)
+         {
+             const size_t node_count = interaction_access.node_count();
+             const size_t node_id = idx[0];
+             if (node_id >= node_count)
+                 return;
+
+             Coordinate_t gravity_vec = Coordinate_t(0.0, gravity);
+             NodeIndex_t node_index = interaction_access.get_node_index(node_id);
+             scalar_t mass_i = node_mass_acc[node_id];
+             Coordinate_t inertial_position = node_inertial_positions_acc[node_id];
+             Coordinate_t node_predicted_position = node_predicted_positions_acc[node_id];
+
+             descent_gradient_acc[node_id] += mass_i * gravity_vec;//.dot(node_predicted_position);
+             descent_gradient_acc[node_id] +=
+                     mass_i / (dt * dt) * (node_predicted_position - inertial_position);
+
+             for (ElasticCollisionWall<CoordinateConfiguration> &wall: walls_acc)
              {
-                 sycl::accessor node_mass_acc(node_data.masses, h);
-                 sycl::accessor node_predicted_positions_acc(node_positions, h);
-                 sycl::accessor node_inertial_positions_acc(node_data.inertial_positions, h);
-                 sycl::accessor descent_gradient_acc(gradient_destination, h);
-                 sycl::accessor walls_acc(collision_walls, h);
-
-
-                 interaction_access.give_kernel_access(h);
-
-                 h.parallel_for(node_data.max_node_count, [=](sycl::id<1> idx)
-                 {
-                     const size_t node_count = interaction_access.node_count();
-                     const size_t node_id = idx[0];
-                     if (node_id >= node_count)
-                         return;
-
-                     Coordinate_t gravity_vec = Coordinate_t(0.0, gravity);
-                     NodeIndex_t node_index = interaction_access.get_node_index(node_id);
-                     scalar_t mass_i = node_mass_acc[node_id];
-                     Coordinate_t inertial_position = node_inertial_positions_acc[node_id];
-                     Coordinate_t node_predicted_position = node_predicted_positions_acc[node_id];
-
-                     descent_gradient_acc[node_id] += mass_i * gravity_vec;//.dot(node_predicted_position);
-                     descent_gradient_acc[node_id] +=
-                             mass_i / (dt * dt) * (node_predicted_position - inertial_position);
-
-                     for (ElasticCollisionWall<CoordinateConfiguration> &wall: walls_acc)
-                     {
-                         descent_gradient_acc[node_id] += wall.gradient(node_predicted_position);
-                     }
-                 });
-             });
+                 descent_gradient_acc[node_id] += wall.gradient(node_predicted_position);
+             }
+         });
+     });
 }
 
 template<class TInterpolationScheme>

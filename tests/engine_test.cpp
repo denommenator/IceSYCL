@@ -163,7 +163,7 @@ TEST_CASE( "First implicit engine test!", "[engine_test]" )
 //    Psi.pressure.gamma = 3.0;
 //    Psi.pressure.c = 100;
     //for(int i = 0; i < 50 * 2; ++i)
-    engine.step_frame_implicit(Psi);
+    engine.step_frame_implicit(Psi, 1, 20);
 
     {
         sycl::host_accessor particle_positions_acc(engine.particle_data.positions);
