@@ -270,7 +270,7 @@ public:
     void step_frame(const ConstitutiveModel Psi, const size_t num_steps_per_frame = 50, const double mu_velocity_damping = 1.0, const double gravity = 981.0)
     {step_frame_explicit(Psi, num_steps_per_frame, mu_velocity_damping, gravity);}
     template<typename ConstitutiveModel>
-    void step_frame_explicit(const ConstitutiveModel Psi, const size_t num_steps_per_frame = 50, const double mu_velocity_damping = 1.0, const double gravity = 981.0);
+    void step_frame_explicit(const ConstitutiveModel Psi, const size_t num_steps_per_frame = 2, const double mu_velocity_damping = 1.0, const double gravity = 981.0);
     void transer_mass_particles_to_nodes(sycl::queue& q);
     void transfer_momentum_particles_to_nodes_APIC(sycl::queue& q);
     void apply_particle_forces_to_grid(sycl::queue& q, sycl::buffer<ElasticCollisionWall<CoordinateConfiguration>>& walls, scalar_t dt, const scalar_t gravity);
@@ -279,16 +279,23 @@ public:
     void compute_node_velocities(sycl::queue& q);
     void transfer_velocity_nodes_to_particles(sycl::queue& q);
     void transfer_velocity_nodes_to_particles_APIC(sycl::queue& q);
+    void apply_particle_velocities_with_aether_damping(sycl::queue& q, const scalar_t dt, const scalar_t mu);
     void update_particle_deformation_gradients(sycl::queue& q, scalar_t dt);
 
 
-    void setup_descent_objective(sycl::queue& q, const scalar_t dt);
     template<typename ConstitutiveModel>
-    void step_frame_implicit(const ConstitutiveModel Psi, const size_t num_steps_per_frame = 50, const double mu_velocity_damping = 1.0);
+    void step_frame_implicit(const ConstitutiveModel Psi, const size_t num_steps_per_frame = 50, const size_t num_descent_steps = 10, const double mu_velocity_damping = 1.0, const double gravity = 981.0);
 
+    void compute_node_inertial_positions(sycl::queue &q, const scalar_t dt);
     void update_particle_deformation_gradients_implicit(sycl::queue& q, scalar_t dt);
     template<typename ConstitutiveModel>
     void compute_descent_gradient(sycl::queue& q, const ConstitutiveModel Psi, scalar_t dt, const double gravity, sycl::buffer<Coordinate_t> &node_positions, sycl::buffer<Coordinate_t> &gradient_destination);
+    void set_descent_direction(sycl::queue &q);
+    template<typename ConstitutiveModel>
+    void compute_directional_hessian(sycl::queue &q, const ConstitutiveModel Psi,scalar_t dt, const double gravity);
+    void initial_step(sycl::queue &q);
+    void compute_particle_velocities(sycl::queue &q, const scalar_t dt);
+    void compute_node_velocities_implicit(sycl::queue& q, const scalar_t dt);
 
 };
 

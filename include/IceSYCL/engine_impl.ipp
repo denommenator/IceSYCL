@@ -37,18 +37,7 @@ void Engine<TInterpolationScheme>::step_frame_explicit(const ConstitutiveModel P
 
         update_particle_deformation_gradients(q, dt);
 
-        q.submit([&](sycl::handler& h)
-        {
-            sycl::accessor positions_acc(particle_data.positions, h);
-            sycl::accessor velocities_acc(particle_data.velocities, h);
-
-            h.parallel_for(particle_count, [=](sycl::id<1> idx)
-            {
-                size_t pid = idx[0];
-                positions_acc[pid] = positions_acc[pid] + dt * velocities_acc[pid];
-                velocities_acc[pid] *= mu_step;
-            });
-        });
+        apply_particle_velocities_with_aether_damping(q, dt, mu_step);
     }
     q.wait();
 }
@@ -359,9 +348,24 @@ void Engine<TInterpolationScheme>::update_particle_deformation_gradients(sycl::q
 
 }
 
+template<class TInterpolationScheme>
+void Engine<TInterpolationScheme>::apply_particle_velocities_with_aether_damping(sycl::queue& q, const scalar_t dt, const scalar_t mu)
+{
 
+    q.submit([&](sycl::handler &h)
+             {
+                 sycl::accessor positions_acc(particle_data.positions, h);
+                 sycl::accessor velocities_acc(particle_data.velocities, h);
 
-
+                 h.parallel_for(particle_count, [=](sycl::id<1> idx)
+                 {
+                     size_t pid = idx[0];
+                     positions_acc[pid] = positions_acc[pid] + dt * velocities_acc[pid];
+                     velocities_acc[pid] *= mu;
+                 });
+             });
+    q.wait();
+}
 
 template<typename TInterpolationScheme>
 template<typename ConstitutiveModel>
