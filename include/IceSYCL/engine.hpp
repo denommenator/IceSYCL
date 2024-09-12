@@ -246,8 +246,10 @@ public:
         gradient_prev{max_node_count},
         descent_direction_dot_grad{1},
         descent_direction_dot_grad_plus{1},
+        descent_direction_dot2{1},
         directional_hessian{1},
         alpha_step{1},
+        line_search_multiplier{1},
         descent_value_0{1},
         descent_value{1},
         continue_line_search_flag{1}
@@ -262,8 +264,10 @@ public:
         sycl::buffer<Coordinate_t> gradient_prev;
         sycl::buffer<scalar_t> descent_direction_dot_grad;
         sycl::buffer<scalar_t> descent_direction_dot_grad_plus;
+        sycl::buffer<scalar_t> descent_direction_dot2;
         sycl::buffer<scalar_t> directional_hessian;
         sycl::buffer<scalar_t> alpha_step;
+        sycl::buffer<scalar_t> line_search_multiplier;
         sycl::buffer<scalar_t> descent_value_0;
         sycl::buffer<scalar_t> descent_value;
         sycl::buffer<bool> continue_line_search_flag;
@@ -303,7 +307,7 @@ public:
     void set_descent_direction(sycl::queue &q);
     template<typename ConstitutiveModel>
     void compute_directional_hessian(sycl::queue &q, const ConstitutiveModel Psi,scalar_t dt, const double gravity);
-    void initial_step(sycl::queue &q);
+    void initial_step(sycl::queue &q, const scalar_t dt);
     void compute_particle_velocities(sycl::queue &q, const scalar_t dt);
     void compute_node_velocities_implicit(sycl::queue& q, const scalar_t dt);
     template<typename ConstitutiveModel>

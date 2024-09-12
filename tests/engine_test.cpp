@@ -168,10 +168,18 @@ TEST_CASE( "First implicit engine test!", "[engine_test]" )
     {
         sycl::host_accessor directional_gradient_acc(engine.descent_data.descent_direction_dot_grad);
         sycl::host_accessor directional_hessian_acc(engine.descent_data.directional_hessian);
+        sycl::host_accessor alpha(engine.descent_data.alpha_step);
+        sycl::host_accessor multiplier(engine.descent_data.line_search_multiplier);
+        sycl::host_accessor value_0(engine.descent_data.descent_value_0);
+        sycl::host_accessor value(engine.descent_data.descent_value);
 
-//        std::cout << "directional derivative: " << directional_gradient_acc[0] << std::endl;
-//        std::cout << "directional hessian: " << directional_hessian_acc[0] << std::endl;
-//        std::cout << "ratio: " << -directional_gradient_acc[0] / directional_hessian_acc[0] << std::endl;
+        std::cout << "directional derivative: " << directional_gradient_acc[0] << std::endl;
+        std::cout << "directional hessian: " << directional_hessian_acc[0] << std::endl;
+        std::cout << "ratio: " << -directional_gradient_acc[0] / directional_hessian_acc[0] << std::endl;
+        std::cout << "value_0: " << value_0[0] << std::endl;
+        std::cout << "value: " << value[0] << std::endl;
+        std::cout << "alpha: " << alpha[0] << std::endl;
+        std::cout << "multiplier: " << multiplier[0] << std::endl;
 
 
     }

@@ -47,7 +47,7 @@ void Engine<TInterpolationScheme>::step_frame_implicit(const ConstitutiveModel P
 
             compute_directional_hessian(q, Psi, dt, gravity);
 
-            initial_step(q);
+            initial_step(q, dt);
 
             back_trace_line_search(q, Psi, dt, gravity);
 
@@ -404,6 +404,7 @@ void Engine<TInterpolationScheme>::compute_directional_hessian(
 
     initial_vec_dot(q, node_data.max_node_count, pgi_manager.node_count, descent_data.gradient, descent_data.descent_direction, descent_data.descent_direction_dot_grad);
     initial_vec_dot(q, node_data.max_node_count, pgi_manager.node_count, descent_data.gradient_plus, descent_data.descent_direction, descent_data.descent_direction_dot_grad_plus);
+    initial_vec_dot(q, node_data.max_node_count, pgi_manager.node_count, descent_data.descent_direction, descent_data.descent_direction, descent_data.descent_direction_dot2);
 
     q.submit([&](sycl::handler& h)
      {
@@ -420,7 +421,7 @@ void Engine<TInterpolationScheme>::compute_directional_hessian(
 
 template<class TInterpolationScheme>
 void Engine<TInterpolationScheme>::initial_step(
-        sycl::queue &q)
+        sycl::queue &q, const scalar_t dt)
 {
 
     auto interaction_access = pgi_manager.kernel_accessor;
@@ -429,11 +430,25 @@ void Engine<TInterpolationScheme>::initial_step(
      {
          sycl::accessor directional_hessian_acc(descent_data.directional_hessian, h);
          sycl::accessor descent_direction_dot_grad_acc(descent_data.descent_direction_dot_grad, h);
+         sycl::accessor descent_direction_dot2_acc(descent_data.descent_direction_dot2, h);
          sycl::accessor alpha_step_acc(descent_data.alpha_step, h);
 
          h.single_task([=]()
            {
-               alpha_step_acc[0] = - descent_direction_dot_grad_acc[0] / directional_hessian_acc[0];
+               scalar_t delta_x_norm = std::sqrt(descent_direction_dot2_acc[0]);
+               scalar_t directional_hessian = directional_hessian_acc[0];
+               scalar_t directional_gradient = descent_direction_dot_grad_acc[0];
+
+               if(delta_x_norm < 1.0E-3 || std::abs(directional_gradient) < 1.0E-3)
+               {
+                   alpha_step_acc[0] = 0.0;
+                   return;
+               }
+
+
+               directional_hessian = std::max(directional_hessian, - directional_gradient / dt * delta_x_norm);
+
+               alpha_step_acc[0] =  - directional_gradient / directional_hessian;
            });
      });
 
@@ -526,14 +541,19 @@ void Engine<TInterpolationScheme>::back_trace_line_search(
     auto q_policy = dpl::execution::make_device_policy(q);
 
     auto interaction_access = pgi_manager.kernel_accessor;
+    scalar_t rho = 0.5;
     q.submit([&](sycl::handler& h){
         sycl::accessor continue_line_search_flag_acc(descent_data.continue_line_search_flag, h);
-        h.single_task([=](){continue_line_search_flag_acc[0] = true;});
+        sycl::accessor multiplier_acc(descent_data.line_search_multiplier, h);
+        h.single_task([=](){
+            continue_line_search_flag_acc[0] = true;
+
+            multiplier_acc[0] = 1.0;});
     });
 
     compute_descent_value(q, Psi, dt, gravity, node_data.predicted_positions, descent_data.descent_value_0, descent_data.continue_line_search_flag);
     int max_backtrace_steps = 20;
-    scalar_t rho = 0.5;
+
     for(int i = 0; i < max_backtrace_steps; ++i)
     {
         compute_descent_value(q, Psi, dt, gravity, descent_data.node_line_search_positions, descent_data.descent_value,
@@ -543,7 +563,7 @@ void Engine<TInterpolationScheme>::back_trace_line_search(
             sycl::accessor continue_line_search_flag_acc(descent_data.continue_line_search_flag, h);
             sycl::accessor descent_value_0_acc(descent_data.descent_value_0, h);
             sycl::accessor descent_value_acc(descent_data.descent_value, h);
-            sycl::accessor alpha_step_acc(descent_data.alpha_step, h);
+            sycl::accessor multiplier_acc(descent_data.line_search_multiplier, h);
 
             h.single_task([=](){
                 if(!continue_line_search_flag_acc[0] )
@@ -553,7 +573,7 @@ void Engine<TInterpolationScheme>::back_trace_line_search(
                     continue_line_search_flag_acc[0] = false;
                     return;
                 }
-                alpha_step_acc[0] = rho * alpha_step_acc[0];
+                multiplier_acc[0] = rho * multiplier_acc[0];
 
             });
         });
@@ -565,12 +585,14 @@ void Engine<TInterpolationScheme>::back_trace_line_search(
             sycl::accessor node_positions_acc(node_data.predicted_positions, h);
             sycl::accessor node_line_search_positions_acc(descent_data.node_line_search_positions, h);
             sycl::accessor descent_direction_acc(descent_data.descent_direction, h);
+            sycl::accessor multiplier_acc(descent_data.line_search_multiplier, h);
+            sycl::accessor continue_line_search_flag_acc(descent_data.continue_line_search_flag, h);
 
             interaction_access.give_kernel_access(h);
 
             h.parallel_for(node_data.max_node_count,[=](sycl::id<1> idx)
             {
-                if(descent_value_acc[0] < descent_value_0_acc[0])
+                if(!continue_line_search_flag_acc[0] )
                     return;
                 const size_t node_count = interaction_access.node_count();
                 const size_t node_id = idx[0];
@@ -578,10 +600,11 @@ void Engine<TInterpolationScheme>::back_trace_line_search(
                     return;
 
                 node_line_search_positions_acc[node_id] =
-                        node_positions_acc[node_id] + alpha_step_acc[0] * descent_direction_acc[node_id];
+                        node_positions_acc[node_id] + multiplier_acc[0] * alpha_step_acc[0] * descent_direction_acc[node_id];
 
             });
         });
+
 
 
     }
