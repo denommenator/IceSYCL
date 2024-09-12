@@ -433,6 +433,8 @@ void Engine<TInterpolationScheme>::initial_step(
          sycl::accessor descent_direction_dot2_acc(descent_data.descent_direction_dot2, h);
          sycl::accessor alpha_step_acc(descent_data.alpha_step, h);
 
+         interaction_access.give_kernel_access(h);
+
          h.single_task([=]()
            {
                scalar_t delta_x_norm = std::sqrt(descent_direction_dot2_acc[0]);
@@ -446,9 +448,16 @@ void Engine<TInterpolationScheme>::initial_step(
                }
 
 
-               directional_hessian = std::max(directional_hessian, - directional_gradient / dt * delta_x_norm);
+               scalar_t max_delta_v = 500.0;
+               //the following formula limits the root mean square of the delta_node_vector / dt,
+               //i.e. the RMS of the velocity change of the nodes
+               scalar_t max_alpha = max_delta_v * dt * std::sqrt(interaction_access.node_count()) / delta_x_norm;
+               scalar_t alpha = - directional_gradient / directional_hessian;
 
-               alpha_step_acc[0] =  - directional_gradient / directional_hessian;
+               if(std::isnan(alpha) || alpha > max_alpha)
+                   alpha = max_alpha;
+
+               alpha_step_acc[0] =  alpha;
            });
      });
 
