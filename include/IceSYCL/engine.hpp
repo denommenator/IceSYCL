@@ -244,11 +244,16 @@ public:
         gradient{max_node_count},
         gradient_plus{max_node_count},
         gradient_prev{max_node_count},
+        gradient_dot2{1},
+        gradient_dot_gradient_prev{1},
+        gradient_prev_dot2{1},
         descent_direction_dot_grad{1},
         descent_direction_dot_grad_plus{1},
         descent_direction_dot2{1},
         directional_hessian{1},
         alpha_step{1},
+        beta_fletcher_reeves{1},
+        descent_step_reset_counter{1},
         line_search_multiplier{1},
         descent_value_0{1},
         descent_value{1},
@@ -262,11 +267,16 @@ public:
         sycl::buffer<Coordinate_t> gradient;
         sycl::buffer<Coordinate_t> gradient_plus;
         sycl::buffer<Coordinate_t> gradient_prev;
+        sycl::buffer<scalar_t> gradient_dot2;
+        sycl::buffer<scalar_t> gradient_dot_gradient_prev;
+        sycl::buffer<scalar_t> gradient_prev_dot2;
         sycl::buffer<scalar_t> descent_direction_dot_grad;
         sycl::buffer<scalar_t> descent_direction_dot_grad_plus;
         sycl::buffer<scalar_t> descent_direction_dot2;
         sycl::buffer<scalar_t> directional_hessian;
         sycl::buffer<scalar_t> alpha_step;
+        sycl::buffer<scalar_t> beta_fletcher_reeves;
+        sycl::buffer<int> descent_step_reset_counter;
         sycl::buffer<scalar_t> line_search_multiplier;
         sycl::buffer<scalar_t> descent_value_0;
         sycl::buffer<scalar_t> descent_value;

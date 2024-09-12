@@ -25,6 +25,7 @@ void Engine<TInterpolationScheme>::step_frame_implicit(const ConstitutiveModel P
     //mu_step = mu^(dt)
     const scalar_t mu_step = std::pow(mu_velocity_damping, dt);
 
+    auto interaction_access = pgi_manager.kernel_accessor;
 
     for (size_t step = 0; step < num_steps_per_frame; ++step)
     {
@@ -38,11 +39,40 @@ void Engine<TInterpolationScheme>::step_frame_implicit(const ConstitutiveModel P
         pgi_manager.update_particle_locations(q, particle_data.positions, interpolator);
 
         compute_node_inertial_positions(q, dt);
+
         update_particle_deformation_gradients_implicit(q, dt);
+
+        q.submit([&](sycl::handler& h){
+            sycl::accessor gradients_acc(descent_data.gradient, h);
+            sycl::accessor descent_direction_acc(descent_data.descent_direction, h);
+            sycl::accessor descent_step_reset_counter_acc(descent_data.descent_step_reset_counter, h);
+
+            interaction_access.give_kernel_access(h);
+
+            h.parallel_for(node_data.max_node_count, [=](sycl::id<1> idx)
+            {
+                const size_t node_count = interaction_access.node_count();
+                const size_t node_id = idx[0];
+                if (node_id >= node_count)
+                    return;
+                gradients_acc[node_id] = Coordinate_t::Zero();
+                descent_direction_acc[node_id] = Coordinate_t::Zero();
+                if(node_id == 0)
+                {
+                    descent_step_reset_counter_acc[0] = 0;
+                }
+            });
+        });
+
         for(size_t descent_step = 0; descent_step < num_descent_steps; ++descent_step)
         {
+            dpl::copy(q_policy, dpl::begin(descent_data.gradient),
+                      dpl::end(descent_data.gradient), dpl::begin(descent_data.gradient_prev));
+
             compute_descent_gradient(q, Psi, dt, gravity, node_data.predicted_positions, descent_data.gradient);
 
+            dpl::copy(q_policy, dpl::begin(descent_data.descent_direction),
+                      dpl::end(descent_data.descent_direction), dpl::begin(descent_data.descent_direction_prev));
             set_descent_direction(q);
 
             compute_directional_hessian(q, Psi, dt, gravity);
@@ -350,22 +380,65 @@ void Engine<TInterpolationScheme>::set_descent_direction(
     auto interaction_access = pgi_manager.kernel_accessor;
     auto n = interpolator;
 
+    initial_vec_dot(q, node_data.max_node_count, pgi_manager.node_count,
+                    descent_data.gradient, descent_data.gradient, descent_data.gradient_dot2);
+    initial_vec_dot(q, node_data.max_node_count, pgi_manager.node_count,
+                    descent_data.gradient, descent_data.gradient_prev, descent_data.gradient_dot_gradient_prev);
+    initial_vec_dot(q, node_data.max_node_count, pgi_manager.node_count,
+                    descent_data.gradient_prev, descent_data.gradient_prev, descent_data.gradient_prev_dot2);
+
+
+
     q.submit([&](sycl::handler &h)
-             {
-                 sycl::accessor descent_gradient_acc(descent_data.gradient, h);
-                 sycl::accessor descent_direction_acc(descent_data.descent_direction, h);
+     {
+         sycl::accessor gradient_dot2_acc(descent_data.gradient_dot2, h);
+         sycl::accessor gradient_dot_gradient_prev_acc(descent_data.gradient_dot_gradient_prev, h);
+         sycl::accessor gradient_prev_dot2_acc(descent_data.gradient_prev_dot2, h);
+         sycl::accessor beta_acc(descent_data.beta_fletcher_reeves, h);
+         sycl::accessor descent_step_reset_counter_acc(descent_data.descent_step_reset_counter, h);
 
-                 interaction_access.give_kernel_access(h);
+         interaction_access.give_kernel_access(h);
 
-                 h.parallel_for(node_data.max_node_count, [=](sycl::id<1> idx)
-                 {
-                     const size_t node_count = interaction_access.node_count();
-                     const size_t node_id = idx[0];
-                     if (node_id >= node_count)
-                         return;
-                     descent_direction_acc[node_id] = -descent_gradient_acc[node_id];
-                 });
-             });
+         h.single_task([=](){
+            scalar_t beta = 0.0;
+            if(descent_step_reset_counter_acc[0] == 0)
+            {
+                beta = 0.0;
+            }
+            else
+            {
+                beta = (gradient_dot2_acc[0] - gradient_dot_gradient_prev_acc[0]) / gradient_prev_dot2_acc[0];
+                beta = std::max(beta, 0.0);
+                if (std::isnan(beta))
+                    beta = 0.0;
+            }
+             descent_step_reset_counter_acc[0]++;
+            int max_reset_steps = 10;
+            if(descent_step_reset_counter_acc[0] >= max_reset_steps)
+                descent_step_reset_counter_acc[0] = 0;
+             beta_acc[0] = beta;
+         });
+     });
+
+    q.submit([&](sycl::handler &h)
+     {
+         sycl::accessor descent_gradient_acc(descent_data.gradient, h);
+         sycl::accessor descent_direction_acc(descent_data.descent_direction, h);
+         sycl::accessor descent_direction_prev_acc(descent_data.descent_direction_prev, h);
+         sycl::accessor beta_acc(descent_data.beta_fletcher_reeves, h);
+
+
+         interaction_access.give_kernel_access(h);
+
+         h.parallel_for(node_data.max_node_count, [=](sycl::id<1> idx)
+         {
+             const size_t node_count = interaction_access.node_count();
+             const size_t node_id = idx[0];
+             if (node_id >= node_count)
+                 return;
+             descent_direction_acc[node_id] = -descent_gradient_acc[node_id] + beta_acc[0] * descent_direction_prev_acc[node_id];
+         });
+     });
 }
 
 template<class TInterpolationScheme>

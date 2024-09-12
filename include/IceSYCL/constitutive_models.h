@@ -127,8 +127,9 @@ public:
     using Coordinate_t = typename CoordinateConfiguration::Coordinate_t;
     using CoordinateMatrix_t = typename CoordinateConfiguration::CoordinateMatrix_t;
 
-    scalar_t lambda;
     scalar_t mu;
+    scalar_t lambda;
+
 
     scalar_t value(CoordinateMatrix_t F) const
     {
