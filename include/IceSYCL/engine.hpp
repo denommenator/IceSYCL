@@ -304,6 +304,11 @@ public:
     void apply_particle_velocities_with_aether_damping(sycl::queue& q, const scalar_t dt, const scalar_t mu);
     void update_particle_deformation_gradients(sycl::queue& q, scalar_t dt);
 
+    template<typename PlasticConstitutiveModel>
+    void step_frame_plastic_explicit(sycl::buffer<PlasticConstitutiveModel> Psis, const size_t num_steps_per_frame, const double mu_velocity_damping, const double gravity);
+    template<typename PlasticConstitutiveModel>
+    void apply_mpm_elastoplastic_forces_to_grid(sycl::queue& q, sycl::buffer<PlasticConstitutiveModel> Psis, const scalar_t dt);
+
 
     template<typename ConstitutiveModel>
     void step_frame_implicit(const ConstitutiveModel Psi, const size_t num_steps_per_frame = 50, const size_t num_descent_steps = 10, const double mu_velocity_damping = 1.0, const double gravity = 981.0);
@@ -330,5 +335,6 @@ public:
 
 #include "engine_impl.ipp"
 #include "descent_impl.ipp"
+#include "plastic_impl.ipp"
 
 #endif //ENGINE_HPP
