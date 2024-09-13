@@ -220,7 +220,7 @@ public:
         small_la::PolarDecomposition(F_E, R, S);
 
         scalar_t J_E = small_la::det(F_E);
-        scalar_t J_P = small_la::det(F_E);
+        scalar_t J_P = small_la::det(F_P);
 
         scalar_t mu = get_mu(J_P);
         scalar_t lambda = get_lambda(J_P);
