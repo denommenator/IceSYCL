@@ -28,7 +28,9 @@ EXPORT_API Engine2D* create_engine(
     size_t particle_count,
     const double* positions,
     const double* velocities,
-    const double h, const double wall_stiffness)
+    const double h,
+    const double wall_stiffness,
+    const double wall_length)
 {
     using namespace iceSYCL;
     using namespace raw_buffer_utility;
@@ -41,9 +43,9 @@ EXPORT_API Engine2D* create_engine(
     const std::vector<Coordinate_t> velocities_vec = to_coordinate_vector<CoordinateConfiguration>(particle_count, velocities);
 
     std::vector<ElasticCollisionWall<CoordinateConfiguration>> walls = {
-            Wall_t{Coordinate_t(0.0, 1.0), Coordinate_t(0.0, -50.0), wall_stiffness},
-            Wall_t{Coordinate_t(1.0, 0.0), Coordinate_t(-100.0, 0.0), wall_stiffness},
-            Wall_t{Coordinate_t(-1.0, 0.0), Coordinate_t(100.0, 0.0), wall_stiffness}
+            Wall_t{Coordinate_t(0.0, 1.0), Coordinate_t(0.0, 0.0), wall_stiffness},
+            Wall_t{Coordinate_t(1.0, 0.0), Coordinate_t(-wall_length / 2.0, 0.0), wall_stiffness},
+            Wall_t{Coordinate_t(-1.0, 0.0), Coordinate_t(wall_length / 2.0, 0.0), wall_stiffness}
     };
 
     Engine2D engine = Engine2D::FromInitialState(
@@ -98,21 +100,21 @@ EXPORT_API void copy_current_positions(Engine2D* engine, double* positions_raw_p
 //     //current_state_raw_ptr[0] = particle_count;
 //  }
 
-//EXPORT_API void step_frame(Engine2D* engine, int num_steps_per_frame, double mu_constitutive, double lambda_constitutive, double mu_damping, double gravity)
-//{
-//    using namespace iceSYCL;
-//    using CoordinateConfiguration = Engine2D::CoordinateConfiguration;
-//    //using ConstitutiveModel = DensityBasedConstitutiveModel<TaitPressureFromDensity<CoordinateConfiguration>>;
-//
-//    using ConstitutiveModel = FixedCorotated<CoordinateConfiguration>;
-//    ConstitutiveModel Psi{FixedCorotated<CoordinateConfiguration>{mu_constitutive, lambda_constitutive}};
-//
-////    using ConstitutiveModel = DensityBasedConstitutiveModel<IdealGasFromDensity<CoordinateConfiguration>>;
-////    ConstitutiveModel Psi{IdealGasFromDensity<CoordinateConfiguration>{1.0, c_speed_of_sound}};
-//
-//
-//    engine->step_frame(Psi, num_steps_per_frame, mu_damping, gravity);
-//}
+EXPORT_API void step_frame_explicit(Engine2D* engine, int num_steps_per_frame, double mu_constitutive, double lambda_constitutive, double mu_damping, double gravity)
+{
+    using namespace iceSYCL;
+    using CoordinateConfiguration = Engine2D::CoordinateConfiguration;
+    //using ConstitutiveModel = DensityBasedConstitutiveModel<TaitPressureFromDensity<CoordinateConfiguration>>;
+
+    using ConstitutiveModel = FixedCorotated<CoordinateConfiguration>;
+    ConstitutiveModel Psi{FixedCorotated<CoordinateConfiguration>{mu_constitutive, lambda_constitutive}};
+
+//    using ConstitutiveModel = DensityBasedConstitutiveModel<IdealGasFromDensity<CoordinateConfiguration>>;
+//    ConstitutiveModel Psi{IdealGasFromDensity<CoordinateConfiguration>{1.0, c_speed_of_sound}};
+
+
+    engine->step_frame_explicit(Psi, num_steps_per_frame, mu_damping, gravity);
+}
 
 EXPORT_API void step_frame_implicit(Engine2D* engine, int num_steps_per_frame, int num_descent_steps, double mu_constitutive, double lambda_constitutive, double mu_damping, double gravity)
 {
@@ -124,7 +126,7 @@ EXPORT_API void step_frame_implicit(Engine2D* engine, int num_steps_per_frame, i
     ConstitutiveModel Psi{FixedCorotated<CoordinateConfiguration>{mu_constitutive, lambda_constitutive}};
 
 //    using ConstitutiveModel = DensityBasedConstitutiveModel<IdealGasFromDensity<CoordinateConfiguration>>;
-//    ConstitutiveModel Psi{IdealGasFromDensity<CoordinateConfiguration>{1.0, c_speed_of_sound}};
+//    ConstitutiveModel Psi{IdealGasFromDensity<CoordinateConfiguration>{1.0, lambda_constitutive}};
 
 
     engine->step_frame_implicit(Psi, num_steps_per_frame, num_descent_steps, mu_damping, gravity);

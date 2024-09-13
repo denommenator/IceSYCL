@@ -211,6 +211,13 @@ void Engine<TInterpolationScheme>::compute_node_velocities(sycl::queue& q)
             if(mass_i > 0.0)
                 velocity_i = 1.0 / (mass_i) * momentum_i;
 
+            scalar_t max_velocity = 1000.0;
+            scalar_t v = std::sqrt(velocity_i.dot(velocity_i));
+            if(v > max_velocity)
+            {
+                velocity_i = max_velocity / v * velocity_i;
+            }
+
             node_velocity_acc[node_id] = velocity_i;
         });
     });
