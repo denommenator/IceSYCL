@@ -159,5 +159,75 @@ public:
     }
 };
 
+template<class TCoordinateConfiguration>
+class SnowPlasticity {
+public:
+    using CoordinateConfiguration = TCoordinateConfiguration;
+    using scalar_t = typename CoordinateConfiguration::scalar_t;
+    using Coordinate_t = typename CoordinateConfiguration::Coordinate_t;
+    using CoordinateMatrix_t = typename CoordinateConfiguration::CoordinateMatrix_t;
+
+    const scalar_t mu_0;
+    const scalar_t lambda_0;
+    const scalar_t xi;
+    const scalar_t theta_c;
+    const scalar_t theta_s;
+    const scalar_t max_exp;
+
+    CoordinateMatrix_t F_P;
+    CoordinateMatrix_t F_E;
+
+    scalar_t get_mu(const scalar_t J_P) const
+    {
+        scalar_t exponent = std::min(xi * (1.0 - J_P), max_exp);
+        return mu_0 * std::exp(exponent);
+    }
+
+    scalar_t get_lambda(const scalar_t J_P) const
+    {
+        scalar_t exponent = std::min(xi * (1.0 - J_P), max_exp);
+        return lambda_0 * std::exp(exponent);
+    }
+
+    scalar_t get_sigma_E(const scalar_t sigma_E_prev) const
+    {
+        return std::clamp(sigma_E_prev, 1 - theta_c, 1 + theta_s);
+    }
+
+    void update(const CoordinateMatrix_t F)
+    {
+        CoordinateMatrix_t F_E_tilde_next = F * F_P.inverse();
+
+        constexpr int dimension = CoordinateMatrix_t::num_rows;
+        CoordinateMatrix_t U, Sigma_E = CoordinateMatrix_t::Zero(), Sigma_E_tilde, V;
+        small_la::SVD(F_E_tilde_next, U, Sigma_E_tilde, V);
+        for(int i = 0; i < dimension; ++i)
+        {
+            Sigma_E(i, i) = get_sigma_E(Sigma_E_tilde(i, i));
+        }
+
+        CoordinateMatrix_t F_E_next = U * Sigma_E * V.transpose();
+        CoordinateMatrix_t F_P_next = F_E_next.inverse() * F;
+
+        F_E = F_E_next;
+        F_P = F_P_next;
+    }
+
+
+    CoordinateMatrix_t PK() const
+    {
+        CoordinateMatrix_t R, S;
+        small_la::PolarDecomposition(F_E, R, S);
+
+        scalar_t J_E = small_la::det(F_E);
+        scalar_t J_P = small_la::det(F_E);
+
+        scalar_t mu = get_mu(J_P);
+        scalar_t lambda = get_lambda(J_P);
+
+        return 2 * mu * (F_E - R) + lambda * (J_E - 1.0) * J_E * small_la::inverse(F_E).transpose();
+    }
+};
+
 }
 #endif //ICESYCL_CONSTITUTIVE_MODELS_H
