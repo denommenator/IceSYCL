@@ -95,7 +95,7 @@ void Engine<TInterpolationScheme>::apply_mpm_elastoplastic_forces_to_grid(sycl::
 
                  NodeIndex_t node_index = interaction.node_index;
 
-                 force_i -= V_p * PK * F.transpose() * n.gradient(node_index, x_p);
+                 force_i -= V_p * PK * Psi_p.F_E.transpose() * n.gradient(node_index, x_p);
 
              }
 

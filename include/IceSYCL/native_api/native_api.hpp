@@ -31,7 +31,8 @@ EXPORT_API Engine2D* create_engine(
     const double* velocities,
     const double h,
     const double wall_stiffness,
-    const double wall_length)
+    const double wall_length,
+    const double density)
 {
     using namespace iceSYCL;
     using namespace raw_buffer_utility;
@@ -53,7 +54,8 @@ EXPORT_API Engine2D* create_engine(
         Engine2D::InterpolationScheme(h),
         positions_vec,
         velocities_vec,
-        walls
+        walls,
+        density
         );
 
     return new Engine2D(engine);
@@ -62,12 +64,12 @@ EXPORT_API Engine2D* create_engine(
 
 EXPORT_API SnowModels* create_snow_constitutive_models(
         size_t particle_count,
-        const double mu_0,
-        const double lambda_0,
-        const double xi,
-        const double theta_c,
-        const double theta_s,
-        const double max_exp
+        double mu_0,
+        double lambda_0,
+        double xi,
+        double theta_c,
+        double theta_s,
+        double max_exp
         )
 {
     using namespace iceSYCL;

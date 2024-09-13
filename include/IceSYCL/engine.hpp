@@ -201,12 +201,12 @@ public:
         InterpolationScheme interpolator,
         std::vector<Coordinate_t> positions,
         std::vector<Coordinate_t> velocities,
-        std::vector<ElasticCollisionWall<CoordinateConfiguration>> walls)
+        std::vector<ElasticCollisionWall<CoordinateConfiguration>> walls,
+        double density = 1.0)
     {
         ParticleGridInteractionManager<InterpolationScheme> pgi_manager(positions.size());
-        const scalar_t unit_density = 1.0;
         ParticleInitialState initial_state = MakeUniformDensityInitialState(positions, velocities, pgi_manager,
-                                                                            interpolator, unit_density);
+                                                                            interpolator, density);
         sycl::buffer<ElasticCollisionWall<CoordinateConfiguration>> walls_b(walls.size());
         host_copy_all(walls, walls_b);
 
