@@ -23,6 +23,7 @@
 // };
 
 using Engine2D = iceSYCL::Engine<iceSYCL::CubicInterpolationScheme<iceSYCL::Double2DCoordinateConfiguration>>;
+using SnowModels = sycl::buffer<iceSYCL::SnowPlasticity<iceSYCL::Double2DCoordinateConfiguration>>;
 
 EXPORT_API Engine2D* create_engine(
     size_t particle_count,
@@ -56,6 +57,45 @@ EXPORT_API Engine2D* create_engine(
         );
 
     return new Engine2D(engine);
+}
+
+
+EXPORT_API SnowModels* create_snow_constitutive_models(
+        size_t particle_count,
+        const double mu_0,
+        const double lambda_0,
+        const double xi,
+        const double theta_c,
+        const double theta_s,
+        const double max_exp
+        )
+{
+    using namespace iceSYCL;
+    using namespace raw_buffer_utility;
+    using CoordinateConfiguration = Engine2D::CoordinateConfiguration;
+    using Coordinate_t = Engine2D::Coordinate_t;
+    using CoordinateMatrix_t = Engine2D::CoordinateMatrix_t;
+    using scalar_t = Engine2D::scalar_t;
+    using PlasticConstitutiveModel = SnowPlasticity<CoordinateConfiguration>;
+
+    SnowModels* Psis_ptr = new SnowModels{particle_count};
+
+    sycl::host_accessor Psis_acc(*Psis_ptr);
+    for(size_t pid = 0; pid < particle_count; ++pid)
+    {
+        const CoordinateMatrix_t I = CoordinateMatrix_t::Identity();
+        Psis_acc[pid] = PlasticConstitutiveModel {
+                mu_0,
+                lambda_0,
+                xi,
+                theta_c,
+                theta_s,
+                max_exp,
+                I,
+                I};
+    }
+    return Psis_ptr;
+
 }
 
 EXPORT_API void copy_current_positions(Engine2D* engine, double* positions_raw_pointer)
@@ -114,6 +154,13 @@ EXPORT_API void step_frame_explicit(Engine2D* engine, int num_steps_per_frame, d
 
 
     engine->step_frame_explicit(Psi, num_steps_per_frame, mu_damping, gravity);
+}
+
+EXPORT_API void step_frame_plastic(Engine2D* engine, SnowModels* Psis, int num_steps_per_frame, double mu_damping, double gravity)
+{
+    using namespace iceSYCL;
+
+    engine->step_frame_plastic_explicit(*Psis, num_steps_per_frame, mu_damping, gravity);
 }
 
 EXPORT_API void step_frame_implicit(Engine2D* engine, int num_steps_per_frame, int num_descent_steps, double mu_constitutive, double lambda_constitutive, double mu_damping, double gravity)

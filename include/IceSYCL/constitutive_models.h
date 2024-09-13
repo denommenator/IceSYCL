@@ -167,12 +167,12 @@ public:
     using Coordinate_t = typename CoordinateConfiguration::Coordinate_t;
     using CoordinateMatrix_t = typename CoordinateConfiguration::CoordinateMatrix_t;
 
-    const scalar_t mu_0;
-    const scalar_t lambda_0;
-    const scalar_t xi;
-    const scalar_t theta_c;
-    const scalar_t theta_s;
-    const scalar_t max_exp;
+    scalar_t mu_0;
+    scalar_t lambda_0;
+    scalar_t xi;
+    scalar_t theta_c;
+    scalar_t theta_s;
+    scalar_t max_exp;
 
     CoordinateMatrix_t F_P;
     CoordinateMatrix_t F_E;
@@ -196,7 +196,7 @@ public:
 
     void update(const CoordinateMatrix_t F)
     {
-        CoordinateMatrix_t F_E_tilde_next = F * F_P.inverse();
+        CoordinateMatrix_t F_E_tilde_next = F * small_la::inverse(F_P);
 
         constexpr int dimension = CoordinateMatrix_t::num_rows;
         CoordinateMatrix_t U, Sigma_E = CoordinateMatrix_t::Zero(), Sigma_E_tilde, V;
@@ -207,7 +207,7 @@ public:
         }
 
         CoordinateMatrix_t F_E_next = U * Sigma_E * V.transpose();
-        CoordinateMatrix_t F_P_next = F_E_next.inverse() * F;
+        CoordinateMatrix_t F_P_next = small_la::inverse(F_E_next) * F;
 
         F_E = F_E_next;
         F_P = F_P_next;

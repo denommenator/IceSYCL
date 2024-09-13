@@ -55,7 +55,7 @@ void Engine<TInterpolationScheme>::apply_mpm_elastoplastic_forces_to_grid(sycl::
          {
              size_t pid = idx[0];
              CoordinateMatrix_t F = deformation_gradients_acc[pid];
-             Psis_acc.update(F);
+             Psis_acc[pid].update(F);
          });
      });
     q.wait();
