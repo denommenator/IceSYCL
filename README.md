@@ -7,6 +7,8 @@ This repository contains an experimental/exploratory implementation of the Mater
 -Compare performance to CPU implementations using standard C++17 CPU parallelism
 
 # Status and Results (preliminary)
+![FixedCorotatedWater](https://github.com/user-attachments/assets/99906355-6b9d-476b-84fa-56800abaadb2)
+
 
 ## Constitutive Models Implemented:
 - Ideal Gas Law
