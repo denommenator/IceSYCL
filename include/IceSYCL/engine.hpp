@@ -21,6 +21,9 @@
 #include "collision.h"
 #include "constitutive_models.h"
 
+#include <fstream>
+#include <iomanip>
+
 
 
 namespace iceSYCL
@@ -311,10 +314,11 @@ public:
 
 
     template<typename ConstitutiveModel>
-    void step_frame_implicit(const ConstitutiveModel Psi, const size_t num_steps_per_frame = 50, const size_t num_descent_steps = 10, const double mu_velocity_damping = 1.0, const double gravity = 981.0);
+    void step_frame_implicit(const ConstitutiveModel Psi, const size_t num_steps_per_frame = 50, const size_t num_descent_steps = 10, const size_t max_num_backsteps = 20, const double mu_velocity_damping = 1.0, const double gravity = 981.0);
 
     void compute_node_inertial_positions(sycl::queue &q, const scalar_t dt);
-    void update_particle_deformation_gradients_implicit(sycl::queue& q, scalar_t dt);
+    void update_particle_deformation_gradients_implicit(sycl::queue& q, scalar_t dt, sycl::buffer<Coordinate_t>& node_positions);
+    void update_particle_deformation_gradients_line_search(sycl::queue& q, scalar_t dt);
     template<typename ConstitutiveModel>
     void compute_descent_gradient(sycl::queue& q, const ConstitutiveModel Psi, scalar_t dt, const double gravity, sycl::buffer<Coordinate_t> &node_positions, sycl::buffer<Coordinate_t> &gradient_destination);
     template<typename ConstitutiveModel>
@@ -326,7 +330,7 @@ public:
     void compute_particle_velocities(sycl::queue &q, const scalar_t dt);
     void compute_node_velocities_implicit(sycl::queue& q, const scalar_t dt);
     template<typename ConstitutiveModel>
-    void back_trace_line_search(sycl::queue &q, const ConstitutiveModel Psi, scalar_t dt, const double gravity);
+    void back_trace_line_search(sycl::queue &q, const ConstitutiveModel Psi, const int max_num_backsteps, scalar_t dt, const double gravity);
 
 };
 

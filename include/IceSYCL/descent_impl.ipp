@@ -14,6 +14,7 @@ template<typename ConstitutiveModel>
 void Engine<TInterpolationScheme>::step_frame_implicit(const ConstitutiveModel Psi,
                                                        const size_t num_steps_per_frame,
                                                        const size_t num_descent_steps,
+                                                       const size_t max_num_backsteps,
                                                        const double mu_velocity_damping,
                                                        const double gravity
 )
@@ -40,7 +41,7 @@ void Engine<TInterpolationScheme>::step_frame_implicit(const ConstitutiveModel P
 
         compute_node_inertial_positions(q, dt);
 
-        update_particle_deformation_gradients_implicit(q, dt);
+        update_particle_deformation_gradients_implicit(q, dt, node_data.predicted_positions);
 
         q.submit([&](sycl::handler& h){
             sycl::accessor gradients_acc(descent_data.gradient, h);
@@ -79,9 +80,9 @@ void Engine<TInterpolationScheme>::step_frame_implicit(const ConstitutiveModel P
 
             initial_step(q, dt);
 
-            back_trace_line_search(q, Psi, dt, gravity);
+            back_trace_line_search(q, Psi, max_num_backsteps, dt, gravity);
 
-            update_particle_deformation_gradients_implicit(q, dt);
+            update_particle_deformation_gradients_implicit(q, dt, node_data.predicted_positions);
         }
 
         compute_node_velocities_implicit(q, dt);
@@ -129,7 +130,7 @@ void Engine<TInterpolationScheme>::compute_node_inertial_positions(sycl::queue &
 }
 
 template<class TInterpolationScheme>
-void Engine<TInterpolationScheme>::update_particle_deformation_gradients_implicit(sycl::queue &q, scalar_t dt)
+void Engine<TInterpolationScheme>::update_particle_deformation_gradients_implicit(sycl::queue &q, scalar_t dt, sycl::buffer<Coordinate_t>& node_positions)
 {
     auto n = interpolator;
     auto interaction_access = pgi_manager.kernel_accessor;
@@ -137,7 +138,7 @@ void Engine<TInterpolationScheme>::update_particle_deformation_gradients_implici
      {
          sycl::accessor del_v_del_x_acc(particle_data.del_v_del_x, h);
          sycl::accessor particle_positions_acc(particle_data.positions, h);
-         sycl::accessor node_predicted_positions_acc(node_data.predicted_positions, h);
+         sycl::accessor node_predicted_positions_acc(node_positions, h);
 
          interaction_access.give_kernel_access(h);
 
@@ -182,6 +183,70 @@ void Engine<TInterpolationScheme>::update_particle_deformation_gradients_implici
              deformation_gradients_acc[pid] = del_v_del_x_acc[pid] * deformation_gradients_prev_acc[pid];
          });
      });
+
+
+}
+
+
+template<class TInterpolationScheme>
+void Engine<TInterpolationScheme>::update_particle_deformation_gradients_line_search(sycl::queue &q, scalar_t dt)
+{
+    auto n = interpolator;
+    auto interaction_access = pgi_manager.kernel_accessor;
+    q.submit([&](sycl::handler &h)
+             {
+                 sycl::accessor del_v_del_x_acc(particle_data.del_v_del_x, h);
+                 sycl::accessor particle_positions_acc(particle_data.positions, h);
+                 sycl::accessor node_predicted_positions_acc(descent_data.node_line_search_positions, h);
+                 sycl::accessor continue_line_search_flag_acc(descent_data.continue_line_search_flag, h);
+
+                 interaction_access.give_kernel_access(h);
+
+                 h.parallel_for(particle_count, [=](sycl::id<1> idx)
+                 {
+                     if(!continue_line_search_flag_acc[0] )
+                         return;
+                     size_t pid = idx[0];
+                     Coordinate_t x_p = particle_positions_acc[pid];
+
+                     CoordinateMatrix_t del_v_del_x_p = CoordinateMatrix_t::Identity();
+                     for (auto interaction_it = interaction_access.particle_interactions_begin(pid);
+                          interaction_it != interaction_access.particle_interactions_end(pid);
+                          ++interaction_it)
+                     {
+                         ParticleNodeInteraction<typename TInterpolationScheme::CoordinateConfiguration> interaction = *interaction_it;
+                         size_t node_id = interaction.node_id;
+                         NodeIndex_t node_index = interaction.node_index;
+                         Coordinate_t x_i = n.position(node_index);
+
+                         Coordinate_t x_i_predicted = node_predicted_positions_acc[node_id];
+
+                         Coordinate_t grad_n_i = n.gradient(node_index, x_p);
+
+                         del_v_del_x_p += (x_i_predicted - x_i) * grad_n_i.transpose();
+                     }
+                     del_v_del_x_acc[pid] = del_v_del_x_p;
+                 });
+             });
+
+    q.submit([&](sycl::handler &h)
+             {
+                 sycl::accessor del_v_del_x_acc(particle_data.del_v_del_x, h);
+                 sycl::accessor particle_positions_acc(particle_data.positions, h);
+                 sycl::accessor deformation_gradients_acc(particle_data.deformation_gradients, h);
+                 sycl::accessor deformation_gradients_prev_acc(particle_data.deformation_gradients_prev, h);
+                 sycl::accessor continue_line_search_flag_acc(descent_data.continue_line_search_flag, h);
+
+                 h.parallel_for(particle_count, [=](sycl::id<1> idx)
+                 {
+                     if(!continue_line_search_flag_acc[0] )
+                         return;
+                     size_t pid = idx[0];
+                     Coordinate_t x_p = particle_positions_acc[pid];
+
+                     deformation_gradients_acc[pid] = del_v_del_x_acc[pid] * deformation_gradients_prev_acc[pid];
+                 });
+             });
 
 
 }
@@ -436,7 +501,7 @@ void Engine<TInterpolationScheme>::set_descent_direction(
              const size_t node_id = idx[0];
              if (node_id >= node_count)
                  return;
-             descent_direction_acc[node_id] = -descent_gradient_acc[node_id] + beta_acc[0] * descent_direction_prev_acc[node_id];
+             descent_direction_acc[node_id] = -descent_gradient_acc[node_id];// + beta_acc[0] * descent_direction_prev_acc[node_id];
          });
      });
 }
@@ -525,10 +590,18 @@ void Engine<TInterpolationScheme>::initial_step(
                //the following formula limits the root mean square of the delta_node_vector / dt,
                //i.e. the RMS of the velocity change of the nodes
                scalar_t max_alpha = max_delta_v * dt * std::sqrt(interaction_access.node_count()) / delta_x_norm;
-               scalar_t alpha = - directional_gradient / directional_hessian;
 
-               if(std::isnan(alpha) || alpha > max_alpha)
+
+               scalar_t alpha = - directional_gradient / std::abs(directional_hessian);
+
+               if(std::isnan(alpha))
+               {
+                   alpha = 0.0;
+               }
+               else if(alpha > max_alpha)
+               {
                    alpha = max_alpha;
+               }
 
                alpha_step_acc[0] =  alpha;
            });
@@ -616,6 +689,7 @@ template<typename ConstitutiveModel>
 void Engine<TInterpolationScheme>::back_trace_line_search(
         sycl::queue &q,
         const ConstitutiveModel Psi,
+        const int max_num_backsteps,
         scalar_t dt,
         const double gravity
 )
@@ -634,10 +708,15 @@ void Engine<TInterpolationScheme>::back_trace_line_search(
     });
 
     compute_descent_value(q, Psi, dt, gravity, node_data.predicted_positions, descent_data.descent_value_0, descent_data.continue_line_search_flag);
-    int max_backtrace_steps = 20;
+    int max_backtrace_steps = max_num_backsteps;
+
+
+//    std::ofstream myfile;
+//    myfile.open ("/home/robert-denomme/my_plugin_logs/log.txt");
 
     for(int i = 0; i < max_backtrace_steps; ++i)
     {
+        update_particle_deformation_gradients_line_search(q, dt);
         compute_descent_value(q, Psi, dt, gravity, descent_data.node_line_search_positions, descent_data.descent_value,
                               descent_data.continue_line_search_flag);
 
@@ -687,9 +766,31 @@ void Engine<TInterpolationScheme>::back_trace_line_search(
             });
         });
 
-
+//        q.wait();
+//        {
+//            sycl::host_accessor descent_value_0_acc(descent_data.descent_value_0);
+//            sycl::host_accessor descent_value_acc(descent_data.descent_value);
+//            sycl::host_accessor directional_hessian_acc(descent_data.directional_hessian);
+//            sycl::host_accessor descent_direction_dot_grad_acc(descent_data.descent_direction_dot_grad);
+//            sycl::host_accessor descent_direction_dot2_acc(descent_data.descent_direction_dot2);
+//            sycl::host_accessor alpha_step_acc(descent_data.alpha_step);
+//            sycl::host_accessor multiplier_acc(descent_data.line_search_multiplier);
+//            sycl::host_accessor continue_line_search_flag_acc(descent_data.continue_line_search_flag);
+//
+//            myfile << std::setprecision(10);
+//            myfile << "Backtrace step: " << i << std::endl;
+//            myfile << "descent value_0: " << descent_value_0_acc[0] << std::endl;
+//            myfile << "descent value: " << descent_value_acc[0] << std::endl;
+//            myfile << "descent gradient: " << descent_direction_dot_grad_acc[0] << std::endl;
+//            myfile << "alpha: " << alpha_step_acc[0] << std::endl;
+//            myfile << "new multiplier value: " << multiplier_acc[0] << std::endl;
+//            myfile << "continue line search? " << (continue_line_search_flag_acc[0] ? "yes" : "no") << std::endl;
+//
+//            myfile << std::endl;
+//        }
 
     }
+//    myfile.close();
     dpl::copy(q_policy, dpl::begin(descent_data.node_line_search_positions), dpl::end(descent_data.node_line_search_positions),
               dpl::begin(node_data.predicted_positions));
 
