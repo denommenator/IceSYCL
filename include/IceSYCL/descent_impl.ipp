@@ -501,7 +501,7 @@ void Engine<TInterpolationScheme>::set_descent_direction(
              const size_t node_id = idx[0];
              if (node_id >= node_count)
                  return;
-             descent_direction_acc[node_id] = -descent_gradient_acc[node_id];// + beta_acc[0] * descent_direction_prev_acc[node_id];
+             descent_direction_acc[node_id] = -descent_gradient_acc[node_id] + beta_acc[0] * descent_direction_prev_acc[node_id];
          });
      });
 }
