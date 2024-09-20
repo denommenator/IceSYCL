@@ -10,7 +10,7 @@ This repository contains an experimental/exploratory implementation of the Mater
 [output.webm](https://github.com/user-attachments/assets/87bf3e25-8b8a-4282-9e93-1a07ffdd853a)
 
 
-[snowman.webm](https://github.com/user-attachments/assets/6775bdd6-d4c8-4603-b378-fdb9f5a10da7)
+[snowman_fracture.webm](https://github.com/user-attachments/assets/673866fb-1c32-49dd-aed6-5402d9efb83b)
 
 
 
