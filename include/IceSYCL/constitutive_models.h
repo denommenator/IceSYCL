@@ -157,6 +157,55 @@ public:
 
         return 2 * mu * (F - R) + lambda * (J - 1.0) * J * small_la::inverse(F).transpose();
     }
+
+    CoordinateMatrix_t apply_hessian(CoordinateMatrix_t F, CoordinateMatrix_t delta_F)
+    {
+        CoordinateMatrix_t R, S;
+        small_la::PolarDecomposition(F, R, S);
+
+        CoordinateMatrix_t LHS = R.transpose() * delta_F - delta_F.transpose() * R;
+
+        if constexpr(CoordinateConfiguration::Dimension == 2)
+        {
+            scalar_t denom = S(0,0) + S(1,1);
+            //TODO division by zero is possible here, but I don't know
+            //how to compute R^T * delta_R when this happens
+            scalar_t r = LHS(0,1) / denom;
+            CoordinateMatrix_t R_trans_delta_R = CoordinateMatrix_t::Zero();
+            R_trans_delta_R(0, 1) = r;
+            R_trans_delta_R(1, 0) = -r;
+
+            CoordinateMatrix_t delta_R = R * R_trans_delta_R;
+
+            scalar_t J = small_la::det(F);
+
+            CoordinateMatrix_t delta_J_F_mtrans = CoordinateMatrix_t::Zero();
+            delta_J_F_mtrans(0, 0) = delta_F(1, 1);
+            delta_J_F_mtrans(0, 1) = -delta_F(1, 0);
+            delta_J_F_mtrans(1, 0) = -delta_F(0, 1);
+            delta_J_F_mtrans(1, 1) = delta_F(0, 0);
+
+            CoordinateMatrix_t J_F_mtrans = CoordinateMatrix_t::Zero();
+            J_F_mtrans(0, 0) = F(1, 1);
+            J_F_mtrans(0, 1) = -F(1, 0);
+            J_F_mtrans(1, 0) = -F(0, 1);
+            J_F_mtrans(1, 1) = F(0, 0);
+
+            scalar_t delta_J =
+                    J_F_mtrans(0, 0) * delta_F(0, 0) +
+                    J_F_mtrans(0, 1) * delta_F(0, 1) +
+                    J_F_mtrans(1, 0) * delta_F(1, 0) +
+                    J_F_mtrans(1, 1) * delta_F(1, 1);
+
+            return 2 * mu * delta_F - 2 * mu * delta_R +
+                lambda * delta_J * J_F_mtrans + lambda * (J - 1) * delta_J_F_mtrans;
+
+
+        } else
+        {
+            static_assert(CoordinateConfiguration::Dimension == 2, "Only dimension 2 is implemented currently.");
+        }
+    }
 };
 
 template<class TCoordinateConfiguration>

@@ -20,6 +20,7 @@
 #include "particle_grid_operations.hpp"
 #include "collision.h"
 #include "constitutive_models.h"
+#include "linear_conjugate_gradient.hpp"
 
 #include <fstream>
 #include <iomanip>
@@ -146,6 +147,7 @@ public:
         rest_volumes{particle_count},
         B_matrices{particle_count},
         D_matrices{particle_count},
+        A_matrices{particle_count},
         deformation_gradients{particle_count},
         del_v_del_x{particle_count},
         deformation_gradients_prev{particle_count}
@@ -179,6 +181,7 @@ public:
         sycl::buffer<scalar_t> rest_volumes;
         sycl::buffer<CoordinateMatrix_t> B_matrices;
         sycl::buffer<CoordinateMatrix_t> D_matrices;
+        sycl::buffer<CoordinateMatrix_t> A_matrices;
         sycl::buffer<CoordinateMatrix_t> deformation_gradients;
         sycl::buffer<CoordinateMatrix_t> del_v_del_x;
         sycl::buffer<CoordinateMatrix_t> deformation_gradients_prev;
@@ -332,6 +335,8 @@ public:
     template<typename ConstitutiveModel>
     void back_trace_line_search(sycl::queue &q, const ConstitutiveModel Psi, const int max_num_backsteps, scalar_t dt, const double gravity);
 
+    template<typename ConstitutiveModel>
+    void apply_hessian_descent_objective(sycl::queue &q, sycl::buffer<Coordinate_t>& delta_u, sycl::buffer<Coordinate_t>& hess_obj_delta_u, const ConstitutiveModel Psi, const int max_num_backsteps, scalar_t dt, const double gravity);
 };
 
 }
