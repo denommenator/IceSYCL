@@ -263,7 +263,8 @@ public:
         line_search_multiplier{1},
         descent_value_0{1},
         descent_value{1},
-        continue_line_search_flag{1}
+        continue_line_search_flag{1},
+        hessian_mul_descent_direction{max_node_count}
         {}
         const size_t max_node_count;
         sycl::buffer<Coordinate_t> node_positions_plus;
@@ -287,6 +288,7 @@ public:
         sycl::buffer<scalar_t> descent_value_0;
         sycl::buffer<scalar_t> descent_value;
         sycl::buffer<bool> continue_line_search_flag;
+        sycl::buffer<Coordinate_t> hessian_mul_descent_direction;
     };
 
     DescentData descent_data;
@@ -336,7 +338,7 @@ public:
     void back_trace_line_search(sycl::queue &q, const ConstitutiveModel Psi, const int max_num_backsteps, scalar_t dt, const double gravity);
 
     template<typename ConstitutiveModel>
-    void apply_hessian_descent_objective(sycl::queue &q, sycl::buffer<Coordinate_t>& delta_u, sycl::buffer<Coordinate_t>& hess_obj_delta_u, const ConstitutiveModel Psi, const int max_num_backsteps, scalar_t dt, const double gravity);
+    void apply_hessian_descent_objective(sycl::queue &q, sycl::buffer<Coordinate_t>& delta_u, sycl::buffer<Coordinate_t>& hess_obj_delta_u, const ConstitutiveModel Psi, scalar_t dt, const double gravity);
 };
 
 }

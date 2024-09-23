@@ -515,6 +515,10 @@ void Engine<TInterpolationScheme>::compute_directional_hessian(
         const double gravity
 )
 {
+
+    apply_hessian_descent_objective(q, descent_data.descent_direction, descent_data.hessian_mul_descent_direction, Psi, dt, gravity);
+    initial_vec_dot(q, node_data.max_node_count, pgi_manager.node_count, descent_data.descent_direction, descent_data.hessian_mul_descent_direction, descent_data.directional_hessian);
+    /*
     auto interaction_access = pgi_manager.kernel_accessor;
     auto n = interpolator;
     scalar_t epsilon = 1.0E-6;
@@ -555,6 +559,7 @@ void Engine<TInterpolationScheme>::compute_directional_hessian(
               directional_hessian_acc[0] = (descent_direction_dot_grad_plus_acc[0] - descent_direction_dot_grad_acc[0]) / epsilon;
           });
      });
+     */
 }
 
 template<class TInterpolationScheme>
@@ -798,10 +803,10 @@ void Engine<TInterpolationScheme>::back_trace_line_search(
 
 template<class TInterpolationScheme>
 template<typename ConstitutiveModel>
-auto Engine<TInterpolationScheme>::apply_hessian_descent_objective(
+void Engine<TInterpolationScheme>::apply_hessian_descent_objective(
         sycl::queue &q,
         sycl::buffer<Coordinate_t>& delta_u,
-        sycl::buffer<Coordinate_t>& hess_obj_delta_u
+        sycl::buffer<Coordinate_t>& hess_obj_delta_u,
         const ConstitutiveModel Psi,
         scalar_t dt,
         const double gravity
@@ -815,6 +820,7 @@ auto Engine<TInterpolationScheme>::apply_hessian_descent_objective(
          sycl::accessor particle_positions_acc(particle_data.positions, h);
          sycl::accessor deformation_gradient_acc(particle_data.deformation_gradients, h);
          sycl::accessor A_matrices_acc(particle_data.A_matrices, h);
+         sycl::accessor node_predicted_positions_acc(node_data.predicted_positions, h);
 
          sycl::accessor delta_u_acc(delta_u, h);
 
@@ -894,7 +900,7 @@ auto Engine<TInterpolationScheme>::apply_hessian_descent_objective(
     q.submit([&](sycl::handler &h)
      {
          sycl::accessor node_mass_acc(node_data.masses, h);
-         sycl::accessor node_predicted_positions_acc(node_positions, h);
+         sycl::accessor node_predicted_positions_acc(node_data.predicted_positions, h);
          sycl::accessor node_inertial_positions_acc(node_data.inertial_positions, h);
          sycl::accessor walls_acc(collision_walls, h);
          sycl::accessor hess_obj_delta_u_acc(hess_obj_delta_u, h);
@@ -922,7 +928,7 @@ auto Engine<TInterpolationScheme>::apply_hessian_descent_objective(
 
              for (ElasticCollisionWall<CoordinateConfiguration> &wall: walls_acc)
              {
-                 descent_gradient_acc[node_id] += wall.apply_hessian(node_predicted_position, delta_u_i);
+                 hess_obj_delta_u_i += wall.apply_hessian(node_predicted_position, delta_u_i);
              }
 
              hess_obj_delta_u_acc[node_id] += hess_obj_delta_u_i;

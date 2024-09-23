@@ -20,21 +20,21 @@ public:
 //    ElasticCollisionWall(ElasticCollisionWall<CoordinateConfiguration>&&) = default;
 //    ElasticCollisionWall<CoordinateConfiguration>& operator=(ElasticCollisionWall<CoordinateConfiguration>&& ) = default;
     
-    scalar_t value(Coordinate_t p)
+    scalar_t value(Coordinate_t p) const
     {
         if(dot(p - p_0, n) > 0.0)
             return 0.0;
         return 0.5 * k_stiffness * dot(p - p_0, n) * dot(p - p_0, n);
     }
 
-    Coordinate_t gradient(Coordinate_t p)
+    Coordinate_t gradient(Coordinate_t p) const
     {
         if(dot(p - p_0, n) > 0.0)
             return Coordinate_t ::Zero();
         return k_stiffness * dot(p - p_0, n) * n;
     }
 
-    Coordinate_t apply_hessian(Coordinate_t p, Coordinate_t delta_p)
+    Coordinate_t apply_hessian(Coordinate_t p, Coordinate_t delta_p) const
     {
         if(dot(p - p_0, n) > 0.0)
             return Coordinate_t ::Zero();

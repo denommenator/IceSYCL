@@ -158,7 +158,7 @@ public:
         return 2 * mu * (F - R) + lambda * (J - 1.0) * J * small_la::inverse(F).transpose();
     }
 
-    CoordinateMatrix_t apply_hessian(CoordinateMatrix_t F, CoordinateMatrix_t delta_F)
+    CoordinateMatrix_t apply_hessian(CoordinateMatrix_t F, CoordinateMatrix_t delta_F) const
     {
         CoordinateMatrix_t R, S;
         small_la::PolarDecomposition(F, R, S);
