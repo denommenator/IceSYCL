@@ -888,6 +888,46 @@ auto Engine<TInterpolationScheme>::apply_hessian_descent_objective(
              hess_obj_delta_u_acc[node_id] = hess_obj_delta_u_i;
          });
      });
+
+
+    //inertia + walls + gravity
+    q.submit([&](sycl::handler &h)
+     {
+         sycl::accessor node_mass_acc(node_data.masses, h);
+         sycl::accessor node_predicted_positions_acc(node_positions, h);
+         sycl::accessor node_inertial_positions_acc(node_data.inertial_positions, h);
+         sycl::accessor walls_acc(collision_walls, h);
+         sycl::accessor hess_obj_delta_u_acc(hess_obj_delta_u, h);
+         sycl::accessor delta_u_acc(delta_u, h);
+
+
+         interaction_access.give_kernel_access(h);
+
+         h.parallel_for(node_data.max_node_count, [=](sycl::id<1> idx)
+         {
+             const size_t node_count = interaction_access.node_count();
+             const size_t node_id = idx[0];
+             if (node_id >= node_count)
+                 return;
+
+             NodeIndex_t node_index = interaction_access.get_node_index(node_id);
+             scalar_t mass_i = node_mass_acc[node_id];
+             Coordinate_t inertial_position = node_inertial_positions_acc[node_id];
+             Coordinate_t node_predicted_position = node_predicted_positions_acc[node_id];
+             Coordinate_t delta_u_i = delta_u_acc[node_id];
+
+             Coordinate_t hess_obj_delta_u_i = Coordinate_t::Zero();
+
+             hess_obj_delta_u_i += mass_i / (dt * dt) * delta_u_i;
+
+             for (ElasticCollisionWall<CoordinateConfiguration> &wall: walls_acc)
+             {
+                 descent_gradient_acc[node_id] += wall.apply_hessian(node_predicted_position, delta_u_i);
+             }
+
+             hess_obj_delta_u_acc[node_id] += hess_obj_delta_u_i;
+         });
+     });
 }
 
 }

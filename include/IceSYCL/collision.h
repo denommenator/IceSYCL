@@ -34,6 +34,13 @@ public:
         return k_stiffness * dot(p - p_0, n) * n;
     }
 
+    Coordinate_t apply_hessian(Coordinate_t p, Coordinate_t delta_p)
+    {
+        if(dot(p - p_0, n) > 0.0)
+            return Coordinate_t ::Zero();
+        return k_stiffness * dot(n, delta_p) * n;
+    }
+
 
     Coordinate_t n;
     Coordinate_t p_0;
