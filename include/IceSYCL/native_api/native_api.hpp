@@ -83,15 +83,22 @@ EXPORT_API SnowModels* create_snow_constitutive_models(
     SnowModels* Psis_ptr = new SnowModels{particle_count};
 
     sycl::host_accessor Psis_acc(*Psis_ptr);
+    std::random_device rd;  // Will be used to obtain a seed for the random number engine
+    std::mt19937 gen(rd()); // Standard mersenne_twister_engine seeded with rd()
+    std::uniform_real_distribution<> mu_dis(0.5, 1.5);
+    std::uniform_real_distribution<> lambda_dis(0.5, 1.5);
+
+    std::uniform_real_distribution<> theta_c_dis(0.5, 1.5);
+    std::uniform_real_distribution<> theta_s_dis(0.5, 1.5);
     for(size_t pid = 0; pid < particle_count; ++pid)
     {
         const CoordinateMatrix_t I = CoordinateMatrix_t::Identity();
         Psis_acc[pid] = PlasticConstitutiveModel {
-                mu_0,
-                lambda_0,
+                mu_0 * mu_dis(gen),
+                lambda_0 * lambda_dis(gen),
                 xi,
-                theta_c,
-                theta_s,
+                theta_c * theta_c_dis(gen),
+                theta_s * theta_s_dis(gen),
                 max_exp,
                 I,
                 I};
