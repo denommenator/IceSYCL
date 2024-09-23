@@ -7,8 +7,10 @@ This repository contains an experimental/exploratory implementation of the Mater
 -Compare performance to CPU implementations using standard C++17 CPU parallelism
 
 # Status and Results (preliminary)
-[output.webm](https://github.com/user-attachments/assets/87bf3e25-8b8a-4282-9e93-1a07ffdd853a)
 
+[Screencast from 2024-09-23 14-50-43_small_trim.webm](https://github.com/user-attachments/assets/a0387a7c-0052-42fd-acd5-717c8ed66f3c)
+
+A fluid simulation using fixed corotated constitutive model with 0 shear modulus. 3,700 particles simulated with fully implicit time integration in real time. 
 
 [Screencast from 2024-09-20 16-22-29.webm](https://github.com/user-attachments/assets/0865a29e-a54d-4057-83ac-33fd826a9686)
 
