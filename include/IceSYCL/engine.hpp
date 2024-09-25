@@ -313,7 +313,7 @@ public:
     void update_particle_deformation_gradients(sycl::queue& q, scalar_t dt);
 
     template<typename PlasticConstitutiveModel>
-    void step_frame_plastic_explicit(sycl::buffer<PlasticConstitutiveModel> Psis, const size_t num_steps_per_frame, const double mu_velocity_damping, const double gravity);
+    void step_frame_plastic_explicit(sycl::buffer<PlasticConstitutiveModel>& Psis, const size_t num_steps_per_frame, const double mu_velocity_damping, const double gravity);
     template<typename PlasticConstitutiveModel>
     void apply_mpm_elastoplastic_forces_to_grid(sycl::queue& q, sycl::buffer<PlasticConstitutiveModel> Psis, const scalar_t dt);
 

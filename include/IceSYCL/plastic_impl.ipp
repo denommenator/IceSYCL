@@ -10,7 +10,7 @@ namespace iceSYCL
 
 template<class TInterpolationScheme>
 template<typename PlasticConstitutiveModel>
-void Engine<TInterpolationScheme>::step_frame_plastic_explicit(sycl::buffer<PlasticConstitutiveModel> Psis, const size_t num_steps_per_frame, const double mu_velocity_damping, const double gravity)
+void Engine<TInterpolationScheme>::step_frame_plastic_explicit(sycl::buffer<PlasticConstitutiveModel>& Psis, const size_t num_steps_per_frame, const double mu_velocity_damping, const double gravity)
 {
     sycl::queue q{};
     auto q_policy = dpl::execution::make_device_policy(q);
