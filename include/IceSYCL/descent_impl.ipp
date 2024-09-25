@@ -519,8 +519,6 @@ void Engine<TInterpolationScheme>::compute_directional_hessian(
     apply_hessian_descent_objective(q, descent_data.descent_direction, descent_data.hessian_mul_descent_direction, Psi, dt, gravity);
     initial_vec_dot(q, node_data.max_node_count, pgi_manager.node_count, descent_data.descent_direction, descent_data.hessian_mul_descent_direction, descent_data.directional_hessian);
 
-    initial_vec_dot(q, node_data.max_node_count, pgi_manager.node_count, descent_data.gradient, descent_data.descent_direction, descent_data.descent_direction_dot_grad);
-    initial_vec_dot(q, node_data.max_node_count, pgi_manager.node_count, descent_data.descent_direction, descent_data.descent_direction, descent_data.descent_direction_dot2);
     /*
     auto interaction_access = pgi_manager.kernel_accessor;
     auto n = interpolator;
@@ -570,6 +568,8 @@ template<class TInterpolationScheme>
 void Engine<TInterpolationScheme>::initial_step(
         sycl::queue &q, const scalar_t dt)
 {
+    initial_vec_dot(q, node_data.max_node_count, pgi_manager.node_count, descent_data.gradient, descent_data.descent_direction, descent_data.descent_direction_dot_grad);
+    initial_vec_dot(q, node_data.max_node_count, pgi_manager.node_count, descent_data.descent_direction, descent_data.descent_direction, descent_data.descent_direction_dot2);
 
     auto interaction_access = pgi_manager.kernel_accessor;
 

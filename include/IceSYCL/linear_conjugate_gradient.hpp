@@ -47,7 +47,8 @@ public:
             x_k_next{max_vec_size},
             Ap_k{max_vec_size},
             p_kAp_k{1},
-            r_kdot2{1}
+            r_kdot2{1},
+            r_k_nextdot2{1}
     {}
 
     size_t max_vec_size;
@@ -133,8 +134,8 @@ public:
                     const size_t i = idx[0];
                     if (i >= actual_vec_size)
                         return;
-                    x_k_next_acc[i] = x_k_acc[i] + alpha[0] * p_k_acc[i];
-                    r_k_next_acc[i] = r_k_acc[i] + alpha[0] * Ap_k_acc[i];
+                    x_k_next_acc[i] = x_k_acc[i] + alpha_acc[0] * p_k_acc[i];
+                    r_k_next_acc[i] = r_k_acc[i] + alpha_acc[0] * Ap_k_acc[i];
                 });
             });
 
@@ -167,7 +168,7 @@ public:
                     const size_t i = idx[0];
                     if (i >= actual_vec_size)
                         return;
-                    p_k_next_acc[i] = -r_k_next_acc[i] + beta[0] * p_k_acc[i];
+                    p_k_next_acc[i] = -r_k_next_acc[i] + beta_acc[0] * p_k_acc[i];
                 });
             });
 

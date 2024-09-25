@@ -165,7 +165,7 @@ EXPORT_API void step_frame_plastic(Engine2D* engine, SnowModels* Psis, int num_s
     engine->step_frame_plastic_explicit(*Psis, num_steps_per_frame, mu_damping, gravity);
 }
 
-EXPORT_API void step_frame_implicit(Engine2D* engine, int num_steps_per_frame, int num_descent_steps, int max_num_backsteps, double mu_constitutive, double lambda_constitutive, double mu_damping, double gravity)
+EXPORT_API void step_frame_implicit(Engine2D* engine, int num_steps_per_frame, int num_descent_steps, int num_linear_solve_steps, int max_num_backsteps, double mu_constitutive, double lambda_constitutive, double mu_damping, double gravity)
 {
     using namespace iceSYCL;
     using CoordinateConfiguration = Engine2D::CoordinateConfiguration;
@@ -178,7 +178,7 @@ EXPORT_API void step_frame_implicit(Engine2D* engine, int num_steps_per_frame, i
 //    ConstitutiveModel Psi{IdealGasFromDensity<CoordinateConfiguration>{1.0, lambda_constitutive}};
 
 
-    engine->step_frame_implicit(Psi, num_steps_per_frame, num_descent_steps, max_num_backsteps, mu_damping, gravity);
+    engine->step_frame_lcg_implicit(Psi, num_steps_per_frame, num_descent_steps, num_linear_solve_steps, max_num_backsteps, mu_damping, gravity);
 }
 
 

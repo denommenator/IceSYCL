@@ -200,7 +200,8 @@ public:
     particle_data{std::move(particle_data)},
     node_data{particle_count * InterpolationScheme::num_interactions_per_particle},
     descent_data{node_data.max_node_count},
-    collision_walls{std::move(walls)}
+    collision_walls{std::move(walls)},
+    lcg_solver{node_data.max_node_count}
     {}
 
     static Engine FromInitialState(
@@ -297,6 +298,31 @@ public:
 
 public:
     template<typename ConstitutiveModel>
+    class HessianApplier : public IApplyMatrix<Coordinate_t>
+    {
+    public:
+        HessianApplier(Engine* engine, const ConstitutiveModel Psi, scalar_t dt, const double gravity):
+        engine(engine),
+        Psi(Psi),
+        dt(dt),
+        gravity(gravity)
+        {}
+
+        void apply_matrix(sycl::queue &q, sycl::buffer<Coordinate_t>& x, sycl::buffer<Coordinate_t>& Ax) override
+        {
+            engine->apply_hessian_descent_objective(q, x, Ax, Psi, dt, gravity);
+        }
+
+        Engine* engine;
+        ConstitutiveModel Psi;
+        scalar_t dt;
+        double gravity;
+
+    };
+
+    LinearConjugateGradient<Coordinate_t> lcg_solver;
+public:
+    template<typename ConstitutiveModel>
     void step_frame(const ConstitutiveModel Psi, const size_t num_steps_per_frame = 50, const double mu_velocity_damping = 1.0, const double gravity = 981.0)
     {step_frame_explicit(Psi, num_steps_per_frame, mu_velocity_damping, gravity);}
     template<typename ConstitutiveModel>
@@ -339,6 +365,10 @@ public:
 
     template<typename ConstitutiveModel>
     void apply_hessian_descent_objective(sycl::queue &q, sycl::buffer<Coordinate_t>& delta_u, sycl::buffer<Coordinate_t>& hess_obj_delta_u, const ConstitutiveModel Psi, scalar_t dt, const double gravity);
+
+    template<typename ConstitutiveModel>
+    void step_frame_lcg_implicit(const ConstitutiveModel Psi, const size_t num_steps_per_frame = 50, const size_t num_descent_steps = 10, const size_t num_linear_solve_steps = 10, const size_t max_num_backsteps = 20, const double mu_velocity_damping = 1.0, const double gravity = 981.0);
+
 };
 
 }
@@ -347,5 +377,6 @@ public:
 #include "engine_impl.ipp"
 #include "descent_impl.ipp"
 #include "plastic_impl.ipp"
+#include "lcg_engine_impl.ipp"
 
 #endif //ENGINE_HPP
