@@ -501,7 +501,7 @@ void Engine<TInterpolationScheme>::set_descent_direction(
              const size_t node_id = idx[0];
              if (node_id >= node_count)
                  return;
-             descent_direction_acc[node_id] = -descent_gradient_acc[node_id] + beta_acc[0] * descent_direction_prev_acc[node_id];
+             descent_direction_acc[node_id] = -descent_gradient_acc[node_id];// + beta_acc[0] * descent_direction_prev_acc[node_id];
          });
      });
 }
@@ -518,6 +518,9 @@ void Engine<TInterpolationScheme>::compute_directional_hessian(
 
     apply_hessian_descent_objective(q, descent_data.descent_direction, descent_data.hessian_mul_descent_direction, Psi, dt, gravity);
     initial_vec_dot(q, node_data.max_node_count, pgi_manager.node_count, descent_data.descent_direction, descent_data.hessian_mul_descent_direction, descent_data.directional_hessian);
+
+    initial_vec_dot(q, node_data.max_node_count, pgi_manager.node_count, descent_data.gradient, descent_data.descent_direction, descent_data.descent_direction_dot_grad);
+    initial_vec_dot(q, node_data.max_node_count, pgi_manager.node_count, descent_data.descent_direction, descent_data.descent_direction, descent_data.descent_direction_dot2);
     /*
     auto interaction_access = pgi_manager.kernel_accessor;
     auto n = interpolator;
@@ -560,6 +563,7 @@ void Engine<TInterpolationScheme>::compute_directional_hessian(
           });
      });
      */
+
 }
 
 template<class TInterpolationScheme>
@@ -819,8 +823,8 @@ void Engine<TInterpolationScheme>::apply_hessian_descent_objective(
      {
          sycl::accessor particle_positions_acc(particle_data.positions, h);
          sycl::accessor deformation_gradient_acc(particle_data.deformation_gradients, h);
+         sycl::accessor deformation_gradient_prev_acc(particle_data.deformation_gradients_prev, h);
          sycl::accessor A_matrices_acc(particle_data.A_matrices, h);
-         sycl::accessor node_predicted_positions_acc(node_data.predicted_positions, h);
 
          sycl::accessor delta_u_acc(delta_u, h);
 
@@ -832,6 +836,7 @@ void Engine<TInterpolationScheme>::apply_hessian_descent_objective(
              size_t pid = idx[0];
              Coordinate_t x_p = particle_positions_acc[pid];
              CoordinateMatrix_t F_p = deformation_gradient_acc[pid];
+             CoordinateMatrix_t F_p_prev = deformation_gradient_prev_acc[pid];
 
              CoordinateMatrix_t delta_F = CoordinateMatrix_t::Zero();
              for (auto interaction_it = interaction_access.particle_interactions_begin(pid);
@@ -843,13 +848,11 @@ void Engine<TInterpolationScheme>::apply_hessian_descent_objective(
                  NodeIndex_t node_index = interaction.node_index;
                  Coordinate_t x_i = n.position(node_index);
 
-                 Coordinate_t x_i_predicted = node_predicted_positions_acc[node_id];
-
                  Coordinate_t grad_n_i = n.gradient(node_index, x_p);
 
                  Coordinate_t delta_u_i = delta_u_acc[node_id];
 
-                 delta_F += delta_u_i * grad_n_i.transpose() * F_p;
+                 delta_F += delta_u_i * grad_n_i.transpose() * F_p_prev;
 
              }
              A_matrices_acc[pid] = Psi.apply_hessian(F_p, delta_F);
@@ -860,7 +863,7 @@ void Engine<TInterpolationScheme>::apply_hessian_descent_objective(
      {
          sycl::accessor particle_positions_acc(particle_data.positions, h);
          sycl::accessor A_matrices_acc(particle_data.A_matrices, h);
-         sycl::accessor deformation_gradient_acc(particle_data.deformation_gradients, h);
+         sycl::accessor deformation_gradient_prev_acc(particle_data.deformation_gradients_prev, h);
          sycl::accessor rest_volume_acc(particle_data.rest_volumes, h);
          sycl::accessor hess_obj_delta_u_acc(hess_obj_delta_u, h);
 
@@ -882,12 +885,12 @@ void Engine<TInterpolationScheme>::apply_hessian_descent_objective(
                  size_t pid = interaction.particle_id;
                  Coordinate_t x_p = particle_positions_acc[pid];
                  scalar_t V_p = rest_volume_acc[pid];
-                 CoordinateMatrix_t F_p = deformation_gradient_acc[pid];
+                 CoordinateMatrix_t F_p_prev = deformation_gradient_prev_acc[pid];
                  CoordinateMatrix_t A_p = A_matrices_acc[pid];
 
                  NodeIndex_t node_index = interaction.node_index;
 
-                 hess_obj_delta_u_i += V_p * A_p * F_p.transpose() * n.gradient(node_index, x_p);
+                 hess_obj_delta_u_i += V_p * A_p * F_p_prev.transpose() * n.gradient(node_index, x_p);
 
              }
 
